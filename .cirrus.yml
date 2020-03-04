@@ -16,7 +16,7 @@ cirrus-ci/passing_task:
 cirrus-ci/failing_task:
     script:
         - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail" > failing_output.log
-        - false
+        - test -z "$CIRRUS_PR"  # only fail when running on pull requests
     always:
         <<: *results
 
