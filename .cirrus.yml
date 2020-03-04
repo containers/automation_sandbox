@@ -1,0 +1,27 @@
+---
+
+container:
+    image: 'registry.fedoraproject.org/fedora-minimal:latest'
+
+
+cirrus-ci/passing_task:
+    script:
+        - echo '$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/pass' > passing_output.log
+        - true
+    always: &results
+        test_artifacts:
+            path: '*.log'
+
+
+cirrus-ci/failing_task:
+    script:
+        - echo '$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail' > failing_output.log
+        - false
+    always:
+        <<: *results
+
+
+cirrus-ci/success_task:
+    depends_on:
+        - cirrus-ci/passing
+        - cirrus-ci/failing
