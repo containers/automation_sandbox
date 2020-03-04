@@ -1,0 +1,11 @@
+---
+
+on:
+    check_suite:
+        types: [completed]
+
+jobs:
+    check_suite_completed:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: hmarr/debug-action@v1.0.0
