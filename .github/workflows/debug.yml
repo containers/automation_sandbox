@@ -1,0 +1,37 @@
+---
+
+on:
+    - check_run:
+    - check_suite:
+    - create:
+    - delete:
+    - deployment:
+    - deployment_status:
+    - fork:
+    - gollum:
+    - issue_comment:
+    - issues:
+    - label:
+    - milestone:
+    - page_build:
+    - project:
+    - project_card:
+    - project_column:
+    - public:
+    - pull_request:
+    - pull_request_review_comment:
+    - push:
+    - push:
+    - registry_package:
+    - release:
+    - repository_dispatch:
+    - schedule:
+        - cron: '*/15 * * * *'
+    - status:
+    - watch:
+
+jobs:
+    debug:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: hmarr/debug-action@v1.0.0
