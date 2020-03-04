@@ -6,7 +6,7 @@ container:
 
 cirrus-ci/passing_task:
     script:
-        - echo '$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/pass' > passing_output.log
+        - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/pass" > passing_output.log
         - true
     always: &results
         test_artifacts:
@@ -15,8 +15,8 @@ cirrus-ci/passing_task:
 
 cirrus-ci/failing_task:
     script:
-        - echo '$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail' > failing_output.log
-        - false
+        - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail" > failing_output.log
+        - test -z "$CIRRUS_PR"  # only fail when running on pull requests
     always:
         <<: *results
 
