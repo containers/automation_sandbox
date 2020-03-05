@@ -11,6 +11,7 @@ jobs:
             - uses: hmarr/debug-action@v1.0.0
             - run: |
                 echo "hello world"
+                echo "more hello world"
                 curl --silent --location \
                     --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
                     --header 'content-type: application/json' \
