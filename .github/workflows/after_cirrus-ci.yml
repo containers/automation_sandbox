@@ -5,13 +5,14 @@ on:
         types: [completed]
 
 jobs:
-    check_suite_completed:
+    event_debug:
         runs-on: ubuntu-latest
         steps:
             - uses: hmarr/debug-action@v1.0.0
-            - run: |
-                curl --silent --location \
-                    --header 'authorization: Bearer ${{ secrets.GITHUB_TOKEN }}' \
-                    --header 'content-type: application/json' \
-                    https://api.github.com/graphql | jq --indent 2 --color-output .
-            - run: echo "more hello world"
+    cirrus_ci_retrospective:
+        runs-on: ubuntu-latest
+        env:
+            DEBUG: 'true'
+        steps:
+            - uses: actions/checkout@v2
+            - run: $GITHUB_WORKSPACE/check_runs.sh
