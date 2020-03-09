@@ -13,6 +13,7 @@ jobs:
         runs-on: ubuntu-latest
         env:
             DEBUG: 'true'
+            GITHUB_TOKEN: '${{ github.token }}'
         steps:
             - uses: actions/checkout@v2
             - run: $GITHUB_WORKSPACE/check_runs.sh
