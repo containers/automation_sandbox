@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -eo pipefail
 
 # Execute inside a github action, using a completed check_suite event's JSON file
 # as input.  Querries details about the concluded Cirrus-CI build, tasks, artifacts,
@@ -39,10 +39,13 @@ encode_query() {
 }
 
 # Get a temporary file named with the calling-function's name
+# Optionally, if the first argument is non-empty, use it as the file extension
 tmpfile() {
     [[ -n "${FUNCNAME[1]}" ]] || \
         die "tmpfile() function bug that should never happen, did."
-    mktemp -p "$TMPDIR" ".tmp_${FUNCNAME[1]}_XXXXXXXX"
+    [[ -n "$1" ]] || \
+        local ext=".$1"
+    mktemp -p "$TMPDIR" ".tmp_${FUNCNAME[1]}_XXXXXXXX${ext}"
 }
 
 
@@ -222,9 +225,6 @@ task_ids=$(filter_verify_query "$GHQL_URL" \
 
 dbg "# Found task names;ids: $task_ids"
 unset GITHUB_TOKEN  # not needed/used for cirrus-ci query
-output_json=$(tmpfile)
-dbg "# Writing task details into '$output_json' temporarily"
-echo '[' > "$output_json"
 echo "$task_ids" | while IFS=';' read task_name task_id
 do
     dbg "# Cross-referencing task '$task_name' ID '$task_id' in Cirrus-CI's API:"
@@ -233,6 +233,8 @@ do
     [[ -n "$task_name" ]] || \
         die "Expecting non-empty name for task id '$task_id'"
 
+    output_json=$(tmpfile .json)
+    dbg "# Writing task details into '$output_json' temporarily"
     filter_verify_query "$CCI_URL" \
     '.[0]' \
     '' \
@@ -247,9 +249,8 @@ do
         }
         artifacts {name files{path}}
       }
-    }" >> "$output_json"
-    echo
+    }" > "$output_json"
 done
-echo ']' >> "$output_json"
 
-pretty_json "$(<$output_json)" | tee "$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
+dbg '# Combining and pretty-formatting all task data as JSON list'
+pretty_json "$(jq --slurp '.' $TMPDIR/.*.json)" | tee "$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
