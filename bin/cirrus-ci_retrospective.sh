@@ -14,9 +14,12 @@ CCI_URL="https://api.cirrus-ci.com/graphql"
 DEBUG=${DEBUG}
 JQ=${JQ:-$(type -P jq)}
 CURL=${CURL:-$(type -P curl)}
+SCRIPT_FILENAME=$(basename $0)
+TMPDIR=$(mktemp -d ".tmp_${SCRIPT_FILENAME}_XXXXXXXX")
+
 
 die() {
-    echo "Error: ${1:-No error mesage given}"
+    echo "Error: ${1:-No error mesage given}" &> /dev/stderr
     exit 1
 }
 
@@ -35,6 +38,14 @@ encode_query() {
     echo "$result"
 }
 
+# Get a temporary file named with the calling-function's name
+tmpfile() {
+    [[ -n "${FUNCNAME[1]}" ]] || \
+        die "tmpfile() function bug that should never happen, did."
+    mktemp -p "$TMPDIR" ".tmp_${FUNCNAME[1]}_XXXXXXXX"
+}
+
+
 # Given a URL Data and optionally a token, validate then print formatted JSON string
 curl_post() {
     local url="$1"
@@ -51,7 +62,7 @@ curl_post() {
         dbg "### Warning: \$GITHUB_TOKEN is empty, performing unauthenticated query of '$url'" > /dev/stderr
     # Don't expose secrets on any command-line
     local headers_tmpf
-    headers_tmpf=$(mktemp -p '' ".tmp_$(basename $0)_XXXXXXXX")
+    headers_tmpf=$(tmpfile)
     cat << EOF > "$headers_tmpf"
 accept: application/vnd.github.antiope-preview+json
 content-type: application/json
@@ -128,6 +139,12 @@ filter_verify_query() {
 
 ##### MAIN #####
 
+if [[ -z "$DEBUG" ]]; then
+    trap "rm -rf $TMPDIR" EXIT
+else
+    dbg "# Warning: Debug mode enabled:  NOT cleaning up '$TMPDIR' upon exit."
+fi
+
 [[ "$GITHUB_ACTIONS" == "true" ]] || \
     die "Expecting to be running inside a Github Action"
 
@@ -139,6 +156,9 @@ filter_verify_query() {
 
 [[ -n "$GITHUB_TOKEN" ]] || \
     die "Expecting non-empty \$GITHUB_TOKEN"
+
+[[ -d "$GITHUB_WORKSPACE" ]] || \
+    die "Expecting to find \$GITHUB_WORKSPACE '$GITHUB_WORKSPACE' as a directory"
 
 [[ "$($JQ --slurp --compact-output --raw-output '.[0].action' < $GITHUB_EVENT_PATH)" == "completed" ]] || \
     die "Expecting github action event action to be 'completed'"
@@ -184,7 +204,6 @@ cr_count=$(filter_verify_query "$GHQL_URL" \
 
 # Unknown yet if all check_runs on check_suite are from Cirrus-CI
 dbg "# Obtaining task names and id's for up to '$cr_count' check_runs max."
-# TODO: I believe ...repository.object.oid is the most convenient access to relative HEAD commit id
 task_ids=$(filter_verify_query "$GHQL_URL" \
     '.[0].data.node.checkRuns.nodes[] | .name + ";" + .externalId' \
     '' \
@@ -197,18 +216,15 @@ task_ids=$(filter_verify_query "$GHQL_URL" \
                 name
               }
             }
-            repository {
-                name
-                object(expression: \"HEAD\") {
-                  oid
-                }
-            }
           }
         }
     }")
 
 dbg "# Found task names;ids: $task_ids"
-unset GITHUB_TOKEN  # not needed/used for cirrus-ci
+unset GITHUB_TOKEN  # not needed/used for cirrus-ci query
+output_json=$(tmpfile)
+dbg "# Writing task details into '$output_json' temporarily"
+echo '[' > "$output_json"
 echo "$task_ids" | while IFS=';' read task_name task_id
 do
     dbg "# Cross-referencing task '$task_name' ID '$task_id' in Cirrus-CI's API:"
@@ -217,18 +233,23 @@ do
     [[ -n "$task_name" ]] || \
         die "Expecting non-empty name for task id '$task_id'"
 
-    cirrus_json=$(filter_verify_query "$CCI_URL" \
-    '.' \
+    filter_verify_query "$CCI_URL" \
+    '.[0]' \
     '' \
     "{
       task(id: $task_id) {
         name
         status
         automaticReRun
-        build {changeIdInRepo branch pullRequest status}
+        build {changeIdInRepo branch pullRequest status repository {
+            owner name cloneUrl masterBranch
+          }
+        }
         artifacts {name files{path}}
       }
-    }")
-    pretty_json "$cirrus_json"
+    }" >> "$output_json"
     echo
 done
+echo ']' >> "$output_json"
+
+pretty_json "$output_json" | tee "$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
