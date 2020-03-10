@@ -5,15 +5,13 @@ on:
         types: [completed]
 
 jobs:
-    event_debug:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: hmarr/debug-action@v1.0.0
     cirrus_ci_retrospective:
+        if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         env:
             # DEBUG: 'true'
             GITHUB_TOKEN: '${{ github.token }}'
         steps:
+            - uses: hmarr/debug-action@v1.0.0
             - uses: actions/checkout@v2
             - run: $GITHUB_WORKSPACE/check_runs.sh
