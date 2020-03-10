@@ -15,7 +15,7 @@ DEBUG=${DEBUG}
 JQ=${JQ:-$(type -P jq)}
 CURL=${CURL:-$(type -P curl)}
 SCRIPT_FILENAME=$(basename $0)
-TMPDIR=$(mktemp -d ".tmp_${SCRIPT_FILENAME}_XXXXXXXX")
+TMPDIR=$(mktemp -p -d ".tmp_${SCRIPT_FILENAME}_XXXXXXXX")
 
 
 die() {
