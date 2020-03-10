@@ -30,5 +30,6 @@ jobs:
     event_debug:
         # Avoid useless executions
         if: github.event.check_suite.app.name == 'Cirrus CI'
+        runs-on: ubuntu-latest
         steps:
             - uses: hmarr/debug-action@v1.0.0
