@@ -252,4 +252,4 @@ do
 done
 echo ']' >> "$output_json"
 
-pretty_json "$(<output_json)" | tee "$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
+pretty_json "$(<$output_json)" | tee "$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
