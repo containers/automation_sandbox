@@ -17,10 +17,10 @@ fi
 verify_env_vars
 
 # Confirm expected triggering event
-[[ "$($JQ --slurp --compact-output --raw-output '.[0].action' < $GITHUB_EVENT_PATH)" == "completed" ]] || \
+[[ "$(jq --slurp --compact-output --raw-output '.[0].action' < $GITHUB_EVENT_PATH)" == "completed" ]] || \
     die "Expecting github action event action to be 'completed'"
 
-cirrus_app_id=$($JQ --slurp --compact-output --raw-output '.[0].check_suite.app.id' < $GITHUB_EVENT_PATH)
+cirrus_app_id=$(jq --slurp --compact-output --raw-output '.[0].check_suite.app.id' < $GITHUB_EVENT_PATH)
 dbg "# Working with Github Application ID: '$cirrus_app_id'"
 [[ -n "$cirrus_app_id" ]] || \
     die "Failed to obtain Cirrus-CI's github app ID number"
@@ -28,7 +28,7 @@ dbg "# Working with Github Application ID: '$cirrus_app_id'"
     die "Expecting Cirrus-CI app ID to be integer greater than 0"
 
 # Guaranteed shortcut by Github API straight to actual check_suite node
-cs_node_id="$($JQ --slurp --compact-output --raw-output '.[0].check_suite.node_id' < $GITHUB_EVENT_PATH)"
+cs_node_id="$(jq --slurp --compact-output --raw-output '.[0].check_suite.node_id' < $GITHUB_EVENT_PATH)"
 dbg "# Working with github global node id '$cs_node_id'"
 [[ -n "$cs_node_id" ]] || \
     die "You must provide the check_suite's node_id string as the first parameter"
