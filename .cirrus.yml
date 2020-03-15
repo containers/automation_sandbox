@@ -1,10 +1,21 @@
 ---
 
+# Default runtime environment
 container:
     image: 'registry.fedoraproject.org/fedora-minimal:latest'
 
 
-cirrus-ci/passing_task:
+# Actual testing task for code in this repo.
+cirrus-ci/actual_test_task:
+    setup_script:
+        - microdnf update -y
+        - microdnf install findutils jq
+    test_script:
+        - $CIRRUS_WORKING_DIR/bin/run_all_tests.sh
+
+
+# CI-Testing (itself) task that always passes + uploads simple artifact
+cirrus-ci/test_passing_task:
     script:
         - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/pass" > passing_output.log
         - true
@@ -13,7 +24,8 @@ cirrus-ci/passing_task:
             path: '*.log'
 
 
-cirrus-ci/failing_task:
+# CI-Testing (itself) task that always fails in PRs + uploads simple artifact
+cirrus-ci/test_failing_task:
     script:
         - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail" > failing_output.log
         - test -z "$CIRRUS_PR"  # only fail when running on pull requests
@@ -21,7 +33,8 @@ cirrus-ci/failing_task:
         <<: *results
 
 
-cirrus-ci/success_task:
+cirrus-ci/test_success_task:
     depends_on:
-        - cirrus-ci/passing
-        - cirrus-ci/failing
+        - cirrus-ci/actual_test
+        - cirrus-ci/test_passing
+        - cirrus-ci/test_failing

@@ -1,0 +1,18 @@
+---
+
+on: [push, pull_request]
+
+jobs:
+    actual_test:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  path: ./
+            - run: $GITHUB_WORKSPACE/bin/run_all_tests.sh
+              # env:
+              #     TEST_DEBUG: 'true'
+    event_debug:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: hmarr/debug-action@v1.0.0

@@ -18,7 +18,7 @@ jobs:
                   persist-credentials: false
                   path: ./
             # TODO: Make this into an action (container image)
-            - run: $GITHUB_WORKSPACE/bin/cirrus-ci_retrospective.sh
+            - run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/cirrus-ci_retrospective.sh
               env:
                 GITHUB_TOKEN: ${{ github.token }}
                 # DEBUG: 'true'
