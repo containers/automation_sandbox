@@ -13,24 +13,40 @@ TMPDIR=$(mktemp -p '' -d "$MKTEMP_FORMAT")
 # Support easier unit-testing
 CURL=${CURL:-$(type -P curl)}
 
+# Using python3 here is a compromise for readability and
+# properly handling quote, control and unicode character encoding.
+json_escape() {
+    local json_string
+    # Assume it's okay to squash repeated whitespaces inside the query
+    json_string=$(printf '%s' "$1" | \
+                  tr --delete '\r\n' | \
+                  tr --squeeze-repeats '[[:space:]]' | \
+        python3 -c 'import sys,json; print(json.dumps(sys.stdin.read()))')
+    # The $json_string in message is already quoted
+    dbg "##### Escaped JSON string: $json_string"
+    echo -n "$json_string"
+}
 
 # Given a GraphQL Query JSON, encode it as a GraphQL query string
 encode_query() {
     dbg "#### Encoding GraphQL Query into JSON string"
     [[ -n "$1" ]] || \
-        die "Expecting JSON string as first argument"
+        die "Expecting JSON string as first argument to ${FUNCNAME[0]}()"
+    local json
+    local quoted
     # Embed GraphQL as escaped string into JSON
-    # Assume strict-mode JSON where strings quoted with "
-    local json_string
-    json_string=$(sed -r -e 's/"/\\"/g' <<<"$1")
-    pretty_json "{\"query\": \"$json_string\"}"  # Handles it's own errors
+    # Using printf's escaping works well
+    quoted=$(json_escape "$1")
+    json=$(jq --compact-output . <<<"{\"query\": $quoted}")
+    dbg "#### Query JSON: $json"
+    echo -n "$json"
 }
 
 # Get a temporary file named with the calling-function's name
 # Optionally, if the first argument is non-empty, use it as the file extension
 tmpfile() {
     [[ -n "${FUNCNAME[1]}" ]] || \
-        die "tmpfile() function bug that should never happen, did."
+        die "tmpfile() function expects to be called by another function."
     [[ -z "$1" ]] || \
         local ext=".$1"
     mktemp -p "$TMPDIR" "$MKTEMP_FORMAT${ext}"
@@ -41,58 +57,71 @@ curl_post() {
     local url="$1"
     local data="$2"
     local token=$GITHUB_TOKEN
-    local ret="0"
     local auth=""
     [[ -n "$url" ]] || \
         die "Expecting non-empty url argument"
     [[ -n "$data" ]] || \
         die "Expecting non-empty data argument"
-    dbg "### Querying endpoint '$url' with"
+
     [[ -n "$token" ]] || \
-        dbg "### Warning: \$GITHUB_TOKEN is empty, performing unauthenticated query of '$url'" > /dev/stderr
+        dbg "### Warning: \$GITHUB_TOKEN is empty, performing unauthenticated query" > /dev/stderr
     # Don't expose secrets on any command-line
     local headers_tmpf
     local headers_tmpf=$(tmpfile headers)
-    local data_tmpf=$(tmpfile data)
-    echo "$data" > "$data_tmpf"
     cat << EOF > "$headers_tmpf"
 accept: application/vnd.github.antiope-preview+json
 content-type: application/json
 ${token:+authorization: Bearer $token}
 EOF
-    $CURL --silent --request POST \
-      --url "$url" \
-      --header "@$headers_tmpf" \
-      --data "@$data_tmpf" || ret=$?
+
+    # Avoid needing to pass large strings on te command-line
+    local data_tmpf=$(tmpfile data)
+    echo "$data" > "$data_tmpf"
+
+    local curl_cmd="$CURL --silent --request POST --url $url --header @$headers_tmpf --data @$data_tmpf"
+    dbg "### Executing '$curl_cmd'"
+    local ret="0"
+    $curl_cmd > /dev/stdout || ret=$?
+
     # Don't leave secrets lying around in files
-    rm -f "$headers_tmpf" &> /dev/null
+    rm -f "$headers_tmpf" "$data_tmpf" &> /dev/null
     dbg "### curl exit code '$ret'"
     return $ret
 }
 
-# Format JSON suitable for human consumption
-# N/B: If output consumed in a sub-shell, it must be examined for 'parse error'
-pretty_json() {
-    local json="$1"
-    [[ -n "$json" ]] || \
-        die "Expecting non-empty json argument"
-    dbg "#### Formatting JSON for possible human consumption"
-    jq --indent 4 . <<<"$json" || die "Call to pretty_json with invalid JSON: '$json'"
-}
-
-# Apply filter to json and print raw output or die with a helpful error
+# Apply filter to json file while making any errors easy to debug
 filter_json() {
     local filter="$1"
-    local json="$2"
+    local json_file="$2"
     [[ -n "$filter" ]] || die "Expected non-empty jq filter string"
-    [[ -n "$json" ]] || die "Expected non-empty JSON"
-    dbg "### Filtering JSON through '$filter'"
-    json=$(pretty_json "$json")
-    jq --compact-output --raw-output "$filter" <<<"$json" || \
-        die "Error filtering JSON with '$filter': \n$json"
+    [[ -r "$json_file" ]] || die "Expected readable JSON file"
+
+    dbg "### Validating JSON in '$json_file'"
+    # Confirm input json is valid and make filter problems easier to debug (below)
+    local tmp_json_file=$(tmpfile json)
+    if ! jq . < "$json_file" > "$tmp_json_file"; then
+        rm -f "$tmp_json_file"
+        # JQ has alrady shown an error message
+        die "Error from jq relating to JSON: $(cat $json_file)"
+    else
+        dbg "### JSON found to be valid"
+        # Allow re-using temporary file
+        cp "$tmp_json_file" "$json_file"
+    fi
+
+    dbg "### Applying filter '$filter'"
+    if ! jq --indent 4 "$filter" < "$json_file" > "$tmp_json_file"; then
+        # JQ has alrady shown an error message
+        rm -f "$tmp_json_file"
+        die "Error from jq relating to JSON: $(cat $json_file)"
+    fi
+
+    dbg "### Filter applied cleanly"
+    cp "$tmp_json_file" "$json_file"
 }
 
-# Name suggests parameter order
+# Name suggests parameter order and purpose
+# N/B: Any @@@@ appearing in test_args will be substituted with the quoted simple/raw JSON value.
 url_query_filter_test() {
     local url="$1"
     local query_json="$2"
@@ -106,37 +135,38 @@ url_query_filter_test() {
         die "Expecting non-empty filter argument"
     [[ -n "$query_json" ]] || \
         die "Expecting non-empty query_json argument"
+
     dbg "## Submitting GraphQL Query, filtering and verifying the result"
     local encoded_query=$(encode_query "$query_json")
-    local result_json
     local ret
+    local curl_outputf=$(tmpfile json)
 
-    local curl_output
-    local curl_outputf=$(tmpfile)
     ret=0
-    curl_post "$url" "$encoded_query" > $curl_outputf || ret=$?
-    dbg "## Curl command exited $ret" > /tmp/test
-    curl_output="$(<$curl_outputf)"
+    curl_post "$url" "$encoded_query" > "$curl_outputf" || ret=$?
+    dbg "## Curl output file: $curl_outputf)"
+    [[ "$ret" -eq "0" ]] || \
+        die "Curl command exited with non-zero code: $ret"
 
-    if [[ "$ret" -ne "0" ]]; then
-        die "Curl command exited $ret with output: $curl_output)"
-    elif grep -q "error" $curl_outputf; then
-        die "Found 'error' in output from curl: $curl_output"
+    if grep -q "error" "$curl_outputf"; then
+        # Barely passable attempt to catch GraphQL query errors
+        die "Found the word 'error' in curl output: $(cat $curl_outputf)"
     fi
 
-    dbg "## Running filter on curl output"
-    local filtered_result=$(filter_json "$filter" "$curl_output")
+    # Validates both JSON and filter, updates $curl_outputf
+    filter_json "$filter" "$curl_outputf"
     if [[ -n "$test_args" ]]; then
-        result_tmpf=$(tmpfile)
-        # make result safe for embedding as string into test command
-        printf '%q' "$filtered_result" | tr -d '[:space:]'  > "$result_tmpf"
-        local _test_args=$(echo "test $test_args" | sed -r -e "s/@@@@/'$(<$result_tmpf)'/g")
-        dbg "## Testing filtered result with '$test_args'"
+        # The test command can only process simple, single-line strings
+        local simplified=$(jq --compact-output --raw-output . < "$curl_outputf" | tr -d '[:space:]')
+        # json_escape will properly quote and escape the value for safety
+        local _test_args=$(sed -r -e "s~@@@@~$(json_escape $simplified)~" <<<"test $test_args")
+        # Catch error coming from sed, e.g. if '~' happens to be in $simplified
+        [[ -n "$_test_args" ]] || \
+            die "Substituting @@@@ in '$test_args'"
+        dbg "## $_test_args"
         ( eval "$_test_args" ) || \
-            die "GraphQL query filtered with $filter failed verification test $test_args: $(<$result_tmpf)"
+            die "Test '$test_args' failed on whitespace-squashed & simplified JSON '$simplified'"
     fi
-    dbg "## Filtered and verified result: '$result_json'"
-    echo "$filtered_result"
+    cat "$curl_outputf"
 }
 
 verify_env_vars() {

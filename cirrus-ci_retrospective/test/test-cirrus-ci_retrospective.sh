@@ -64,12 +64,15 @@ test_cmd \
     'Caught call to die.+encode_query.+JSON' \
     encode_query
 
-PARSE_ERR_RX='parse error: Invalid literal.+Caught call.+(encode_query)|(pretty_json).+JSON'
-test_cmd \
-    "Call to encode_query '\\\"foobar' reports an expected error" \
-    $SPECIAL_DEATH_CODE \
-    "$PARSE_ERR_RX" \
-    encode_query '{\"foobar{'
+COMPLEX="{\"foo
+            \t\"\t\t           bar{\r '"
+for test_f in json_escape encode_query; do
+    test_cmd \
+        "Call to $test_f properly handles complex string containing control-characters and embedded quotes" \
+        0 \
+        ".*foo.*bar.*" \
+        $test_f "$COMPLEX"
+done
 
 # e.g. output
 # {
@@ -78,7 +81,7 @@ test_cmd \
 test_cmd \
     "Call to encode_query '[]' is formatted in the expected way" \
     0 \
-    '\{[[:space:]]+"query":[[:space:]]+"\[\][[:space:]]*"[[:space:]]+\}' \
+    '\{"query":"\[\]"\}' \
     encode_query '[]'
 
 TEST_EXTENSION=foobarbaz
@@ -94,37 +97,27 @@ test_cmd \
     "$TMPDIR.+\.$TEST_EXTENSION" \
     tmpfile "$TEST_EXTENSION"
 
-test_cmd \
-    "Verify pretty_json treats missing arument as an error" \
-    $SPECIAL_DEATH_CODE \
-    'Caught.+pretty_json.+Expecting non-empty json argument' \
-    pretty_json
-
-test_cmd \
-    "Verify pretty_json properly handles a parsing error" \
-    $SPECIAL_DEATH_CODE \
-    "$PARSE_ERR_RX" \
-    pretty_json "{null}"
-
 TEST_JSON='[{"1":2},{"3":4}]'
+TEST_JSON_FILE=$(mktemp -p "$_TMPDIR" TEST_JSON_XXXXXXXX)
+echo "$TEST_JSON" > "$TEST_JSON_FILE"
 test_cmd \
-    "Verify pretty_json $TEST_JSON output (test_cmd mangled) to match intput" \
-    0 \
-    '\[ \{ "1": 2 \}, \{ "3": 4 \} \] ' \
-    pretty_json "$TEST_JSON"
-
-test_cmd \
-    "Verify filter_json with invalid filter raises an error" \
+    "Verify filter_json with invalid filter mentions jq in error" \
     $SPECIAL_DEATH_CODE \
-    'Caught call to die.+filter_json.+Error filtering' \
-    filter_json "!" "$TEST_JSON"
+    'Caught.+filter_json.+jq' \
+    filter_json "!" "$TEST_JSON_FILE"
 
 TEST_FILT='.[1]["3"]'
 test_cmd \
-    "Verify filter_json '$TEST_FILT' '$TEST_JSON' output is as expected" \
+    "Verify filter_json '$TEST_FILT' '$TEST_JSON_FILE' has no output" \
     0 \
-    "^4 $" \
-    filter_json "$TEST_FILT" "$TEST_JSON"
+    "" \
+    filter_json "$TEST_FILT" "$TEST_JSON_FILE"
+
+test_cmd \
+    "Verify final copy of '$TEST_JSON_FILE' has expected contents" \
+    0 \
+    '^4 $' \
+    cat "$TEST_JSON_FILE"
 
 # Makes checking temp-files writen by curl_post() easier
 TMPDIR=$(mktemp -d -p "$_TMPDIR" "tmpdir_curl_XXXXX")

@@ -29,9 +29,12 @@ jobs:
                   name: cirrus-ci_retrospective
                   # Script (above) generate this filename
                   path: ./cirrus-ci_retrospective.json
-    event_debug:
+    debug:
         # Avoid useless executions
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - uses: hmarr/debug-action@v1.0.0
+            - uses: actions/upload-artifact@v1.0.0
+              with:
+                  name: event.json
+                  path: ${{ github.event_path }}
