@@ -4,9 +4,23 @@
 # Intended for use by other scripts, not to be executed directly.
 
 # helper, not intended for use outside this file
+_rel_path() {
+    local abs_path=$(realpath "$1")
+    local rel_path=$(realpath --relative-to=$PWD $abs_path)
+    local abs_path_len=${#abs_path}
+    local rel_path_len=${#rel_path}
+    if ((abs_path_len <= rel_path_len)); then
+        echo "$abs_path"
+    else
+        echo "$rel_path"
+    fi
+}
+
+# helper, not intended for use outside this file
 _ctx() {
     # Caller's caller details
-    echo "${BASH_SOURCE[3]}:${BASH_LINENO[2]} in ${FUNCNAME[3]}()"
+    local shortest_source_path=$(_rel_path "${BASH_SOURCE[3]}")
+    echo "$shortest_source_path:${BASH_LINENO[2]} in ${FUNCNAME[3]}()"
 }
 
 # helper, not intended for use outside this file.
@@ -33,6 +47,10 @@ die() {
 
 dbg() {
     if ((DEBUG)); then
-        echo "DEBUG: ${1:-No debugging message given} $(_ctx)}" > /dev/stderr
+        local shortest_source_path=$(_rel_path "${BASH_SOURCE[1]}")
+        (
+        echo
+        echo "DEBUG: ${1:-No debugging message given} ($shortest_source_path:${BASH_LINENO[0]} in ${FUNCNAME[1]}())"
+        ) > /dev/stderr
     fi
 }
