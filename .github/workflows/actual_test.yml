@@ -17,5 +17,6 @@ jobs:
         steps:
             - uses: actions/upload-artifact@v1.0.0
               with:
-                  name: event.json
+                  # There is no way to avoid this being zipped :(
+                  name: event.json.zip
                   path: ${{ github.event_path }}
