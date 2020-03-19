@@ -9,7 +9,7 @@ container:
 cirrus-ci/actual_test_task:
     setup_script:
         - microdnf update -y
-        - microdnf install findutils jq
+        - microdnf install findutils git jq
     test_script:
         - $CIRRUS_WORKING_DIR/bin/run_all_tests.sh
 

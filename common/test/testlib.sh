@@ -9,7 +9,7 @@ TEST_DEBUG=${TEST_DEBUG:-0}
 # Unit-tests for library with a similar name
 TEST_FILENAME=$(basename $0)  # prefix-replace needs this as a variable
 SUBJ_FILENAME="${TEST_FILENAME#test-}"; unset TEST_FILENAME
-TEST_DIR=$(dirname $0)/../lib
+TEST_DIR="${TEST_DIR:-$(dirname $0)/../lib}"
 
 # Always run all tests, and keep track of failures.
 FAILURE_COUNT=0
@@ -46,7 +46,7 @@ _test_report() {
             echo " (output follows)"
             cat "$outf"
         fi
-        rm -f "$outf"
+        rm -f "$outf" "$outf.oneline"
     fi
     echo -e '\n' # Makes output easier to read
 }
@@ -70,7 +70,8 @@ test_cmd() {
     local a_exit=0
 
     # Use a sub-shell to capture possible function exit call and all output
-    ( set -e; "$@" &> $a_out_f )
+    set -o pipefail
+    ( set -e; "$@" |& tee "$a_out_f" | tr -s '[:space:]' ' ' &> "${a_out_f}.oneline")
     a_exit="$?"
 
     if [[ -n "$e_exit" ]] && [[ $e_exit -ne $a_exit ]]; then
@@ -78,12 +79,10 @@ test_cmd() {
     elif [[ -z "$e_out_re" ]] && [[ -n "$(<$a_out_f)" ]]; then
         _test_report "Expecting no output from $@" 1 "$a_out_f"
     elif [[ -n "$e_out_re" ]]; then
-        # Make matching to multi-line output easier
-        tr -s '[:space:]' ' ' < "$a_out_f" > "${a_out_f}.oneline"; mv "${a_out_f}.oneline" "$a_out_f"
-        if egrep -q "$e_out_re" "${a_out_f}"; then
+        if egrep -q "$e_out_re" "${a_out_f}.oneline"; then
             _test_report "Command $1 exited as expected with expected output" 0 "$a_out_f"
         else
-            _test_report "Expecting regex '$e_out_re' match to whitespace-squashed output" 1 "$a_out_f"
+            _test_report "Expecting regex '$e_out_re' match to (whitespace-squashed) output" 1 "$a_out_f"
         fi
     else # Pass
         _test_report "Command $1 exited as expected ($a_exit)" 0 "$a_out_f"
