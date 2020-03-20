@@ -89,7 +89,7 @@ exec_installer() {
             exit 6
         fi
         # Force version to be installed as the current local repository version
-        AUTOMATION_VERSION=$(git describe HEAD)
+        AUTOMATION_VERSION="0.0.0"
         msg "Using actual installer version '$AUTOMATION_VERSION' from local repository clone"
         # Allow installer to clean-up TEMPDIR as with updated source
         cp --archive ./* ./.??* "$TEMPDIR/."
@@ -108,7 +108,7 @@ exec_installer() {
             TEMPDIR="$TEMPDIR" \
             TEST_INSTALL_PREFIX="$TEST_INSTALL_PREFIX" \
             _MAGIC_JUJU="$_DEFAULT_MAGIC_JUJU" \
-            /bin/bash "$DOWNLOADED_INSTALLER" -- "$AUTOMATION_VERSION"
+            /bin/bash "$DOWNLOADED_INSTALLER" "$AUTOMATION_VERSION"
     else
         msg "Error: '$DOWNLOADED_INSTALLER' does not exist or is not executable" > /dev/stderr
         # Allow exi
