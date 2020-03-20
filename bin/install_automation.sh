@@ -94,8 +94,6 @@ exec_installer() {
         # Allow installer to clean-up TEMPDIR as with updated source
         cp --archive ./* ./.??* "$TEMPDIR/."
     else  # Retrieve the requested version (tag) of the source code
-        msg "Refreshing remote repository '$AUTOMATION_REPO_URL'"
-        git remote update
         msg "Attempting to clone branch/tag 'v$AUTOMATION_VERSION'"
         git clone --quiet --branch "v$AUTOMATION_VERSION" --depth 1 "$AUTOMATION_REPO_URL" "$TEMPDIR/."
     fi
