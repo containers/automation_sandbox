@@ -95,7 +95,9 @@ exec_installer() {
         cp --archive ./* ./.??* "$TEMPDIR/."
     else  # Retrieve the requested version (tag) of the source code
         msg "Attempting to clone branch/tag 'v$AUTOMATION_VERSION'"
-        git clone --quiet --branch "v$AUTOMATION_VERSION" --depth 1 "$AUTOMATION_REPO_URL" "$TEMPDIR/."
+        git clone --quiet --branch "v$AUTOMATION_VERSION" \
+            --depth 1 --config advice.detachedHead=false \
+            "$AUTOMATION_REPO_URL" "$TEMPDIR/."
     fi
 
     DOWNLOADED_INSTALLER="$TEMPDIR/bin/$SCRIPT_FILENAME"
@@ -106,7 +108,7 @@ exec_installer() {
             TEMPDIR="$TEMPDIR" \
             TEST_INSTALL_PREFIX="$TEST_INSTALL_PREFIX" \
             _MAGIC_JUJU="$_DEFAULT_MAGIC_JUJU" \
-            "$DOWNLOADED_INSTALLER" "$AUTOMATION_VERSION"
+            /bin/bash "$DOWNLOADED_INSTALLER" -- "$AUTOMATION_VERSION"
     else
         msg "Error: '$DOWNLOADED_INSTALLER' does not exist or is not executable" > /dev/stderr
         # Allow exi
