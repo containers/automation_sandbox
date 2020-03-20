@@ -18,6 +18,7 @@ set -e
 
 # FIXME: Should be automation, not automation_sandbox
 AUTOMATION_REPO_URL=${AUTOMATION_REPO_URL:-https://github.com/containers/automation_sandbox.git}
+AUTOMATION_REPO_BRANCH=${AUTOMATION_REPO_BRANCH:-master}
 SCRIPT_FILENAME=$(basename $0)
 # The source version requested for installing
 AUTOMATION_VERSION="$1"
@@ -37,12 +38,18 @@ d41d844b68a14ee7b9e6a6bb88385b4d() {
     TEMPDIR=$(realpath "$(dirname $0)/../")
     trap "rm -rf $TEMPDIR" EXIT
 
+    if [[ "$AUTOMATION_VERSION" == "$MAGIC_LOCAL_VERSION" ]] || [[ "$AUTOMATION_VERSION" == "latest" ]]; then
+        msg "BUG: Actual installer requires actual version number, not '$AUTOMATION_VERSION'"
+        exit 16
+    fi
+
     local actual_inst_path="$INSTALL_PREFIX/automation"
-    msg "Installing common scripts/libraries version into '$actual_inst_path'"
+    msg "Installing common scripts/libraries version '$AUTOMATION_VERSION' into '$actual_inst_path'"
 
     # Allow re-installing different versions, clean out old version if found
     if [[ -d "$actual_inst_path" ]] && [[ -r "$actual_inst_path/AUTOMATION_VERSION" ]]; then
-        msg "Warning: Removing existing installed version $(cat $actual_inst_path/AUTOMATION_VERSION)"
+        local installed_version=$(cat "$actual_inst_path/AUTOMATION_VERSION")
+        msg "Warning: Removing existing installed version '$installed_version'"
         rm -rvf "$actual_inst_path"
     elif [[ -d "$actual_inst_path" ]]; then
         msg "Error: Unable to deal with unknown contents of '$actual_inst_path', manual removal required"
@@ -63,10 +70,11 @@ d41d844b68a14ee7b9e6a6bb88385b4d() {
     cd "$TEMPDIR/common"
     install -v $inst_perm_arg -D -t "$actual_inst_path/bin" ./bin/*
     install -v $inst_perm_arg -D -t "$actual_inst_path/lib" ./lib/*
+    cd "$TEMPDIR"
+    install -v $inst_perm_arg -D -t "$actual_inst_path/bin" "./bin/$SCRIPT_FILENAME"
 
-    msg "Configuring env. vars. \$AUTOMATION_LIB_PATH and PATH in $etc_env_filepath"
+    msg "Configuring \$AUTOMATION_LIB_PATH=$actual_inst_path/lib in '$etc_env_filepath'"
     echo "export AUTOMATION_LIB_PATH='$actual_inst_path/lib'" >> "$etc_env_filepath"
-    echo "export PATH=$PATH:$actual_inst_path/bin" >> "$etc_env_filepath"
 
     # Last step marks a clean install
     echo "$AUTOMATION_VERSION" >> "$actual_inst_path/AUTOMATION_VERSION"
@@ -90,16 +98,28 @@ exec_installer() {
         fi
         # Force version to be installed as the current local repository version
         AUTOMATION_VERSION="0.0.0"
-        msg "Using actual installer version '$AUTOMATION_VERSION' from local repository clone"
         # Allow installer to clean-up TEMPDIR as with updated source
         cp --archive ./* ./.??* "$TEMPDIR/."
     else  # Retrieve the requested version (tag) of the source code
-        msg "Attempting to clone branch/tag 'v$AUTOMATION_VERSION'"
-        git clone --quiet --branch "v$AUTOMATION_VERSION" \
+        local version_arg="v$AUTOMATION_VERSION"
+        if [[ "$AUTOMATION_VERSION" == "latest" ]]; then
+            version_arg=$AUTOMATION_REPO_BRANCH
+        fi
+        msg "Attempting to clone branch/tag '$version_arg'"
+        git clone --quiet --branch "$version_arg" \
             --depth 1 --config advice.detachedHead=false \
             "$AUTOMATION_REPO_URL" "$TEMPDIR/."
     fi
 
+    cd "$TEMPDIR"
+    if [[ "$AUTOMATION_VERSION" == "$MAGIC_LOCAL_VERSION" ]] || [[ "$AUTOMATION_VERSION" == "latest" ]]; then
+        # After install, precise version will be helpful to future sys admins
+        msg "Retrieving version information"
+        git fetch --tags
+        AUTOMATION_VERSION=$(git describe --always HEAD)
+    fi
+
+    # Full path is required so script can find and install itself
     DOWNLOADED_INSTALLER="$TEMPDIR/bin/$SCRIPT_FILENAME"
     if [[ -x "$DOWNLOADED_INSTALLER" ]]; then
         msg "Executing install for version '$AUTOMATION_VERSION'"
@@ -119,9 +139,10 @@ exec_installer() {
 check_args() {
     if [[ -z "$AUTOMATION_VERSION" ]]; then
         msg "Error: Must specify the version number to install, as the first and only argument."
-        msg "       Use version '$MAGIC_LOCAL_VERSION' to install from current source"
+        msg "       Use version '$MAGIC_LOCAL_VERSION' to install from local source."
+        msg "       Use version 'latest' to install from current upstream"
         exit 2
-    elif ! echo "$AUTOMATION_VERSION" | egrep -q '^v?[0-9]+\.[0-9]+\.[0-9]+(-.+)?'; then
+    elif ! echo "$AUTOMATION_VERSION" | egrep -q '^(latest)|^(v?[0-9]+\.[0-9]+\.[0-9]+(-.+)?)'; then
         msg "Error: '$AUTOMATION_VERSION' does not appear to be a valid version number"
         exit 4
     fi

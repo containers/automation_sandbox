@@ -52,5 +52,10 @@ test_cmd \
     0 "^export AUTOMATION_LIB_PATH=" \
     cat $TEST_INSTALL_ROOT/automation/environment
 
+test_cmd \
+    "The installer can install the latest upstream version" \
+    0 "Configuring.+$TEST_INSTALL_ROOT/automation/environment" \
+    env INSTALL_PREFIX="$TEST_INSTALL_ROOT" $INSTALLER_FILEPATH latest
+
 # Must be last call
 exit_with_status
