@@ -8,6 +8,8 @@ jobs:
         steps:
             - uses: actions/checkout@v2
               with:
+                  # Testing installer requires a full repo. history
+                  fetch-depth: 0
                   path: ./
             - run: $GITHUB_WORKSPACE/bin/run_all_tests.sh
               # env:

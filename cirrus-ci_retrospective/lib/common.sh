@@ -1,6 +1,7 @@
 
 # This library simply sources the necessary common libraries.
 # Not intended for direct execution
-source "$(dirname $0)/../../common/lib/anchors.sh"
-source "$COMMON_LIB_PATH/defaults.sh"
-source "$COMMON_LIB_PATH/console_output.sh"
+AUTOMATION_LIB_PATH="${AUTOMATION_LIB_PATH:-$(dirname ${BASH_SOURCE[0]})/../../common/lib}"
+source "$AUTOMATION_LIB_PATH/anchors.sh"
+source "$AUTOMATION_LIB_PATH/defaults.sh"
+source "$AUTOMATION_LIB_PATH/console_output.sh"

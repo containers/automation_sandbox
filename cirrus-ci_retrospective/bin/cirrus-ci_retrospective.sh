@@ -17,7 +17,7 @@ fi
 verify_env_vars
 
 INTERMEDIATE_OUTPUT_EXT=".json_item"
-OUTPUT_JSON_FILE="$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json"
+OUTPUT_JSON_FILE="${GITHUB_WORKSPACE:-/tmp/}/${SCRIPT_FILENAME%.sh}.json"
 
 # Confirm expected triggering event
 [[ "$(jq --slurp --compact-output --raw-output '.[0].action' < $GITHUB_EVENT_PATH)" == "completed" ]] || \
