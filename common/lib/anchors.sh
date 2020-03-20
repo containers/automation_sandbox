@@ -17,6 +17,7 @@ automation_version() {
     elif [[ -n "$(type -P git)" ]] && $git_cmd &> /dev/null; then
         $git_cmd
     else
-        echo ""
+        echo "Error determining version number" > /dev/stderr
+        exit 1
     fi
 }

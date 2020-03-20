@@ -56,16 +56,16 @@ test_cmd "Without AUTOMATION_VERSION file, automation_version() uses git" \
 
 echo "exit 123" >> "$TEMPDIR/git"
 
-test_cmd "Without AUTOMATION_VERSION file, a git error git causes automation_version() to return an empty string" \
-    0 "" \
+test_cmd "Without AUTOMATION_VERSION file, a git error causes automation_version() to error" \
+    1 "Error determining version number" \
     automation_version
 
 ln -sf /usr/bin/* $TEMPDIR/
 ln -sf /bin/* $TEMPDIR/
 rm -f "$TEMPDIR/git"
 export PATH=$TEMPDIR
-test_cmd "Without git or AUTOMATION_VERSION file, automation_version() returns empty string"\
-    0 "" \
+test_cmd "Without git or AUTOMATION_VERSION file automation_version() errorsr"\
+    1 "Error determining version number" \
     automation_version
 unset PATH
 export PATH=$actual_path
