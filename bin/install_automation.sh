@@ -126,14 +126,6 @@ exec_installer() {
         # Allow installer to clean-up TEMPDIR as with updated source
         dbg "Copying repository into \$TEMPDIR"
         cp --archive ./* ./.??* "$TEMPDIR/."
-        dbg "Now working from \$TEMPDIR"
-        cd "$TEMPDIR"
-        if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
-            msg "Retrieving complete version information for local repository"
-            $OOE git fetch --unshallow --tags
-        fi
-        msg "Attempting to rettrieve actual version based on all configured remotes"
-        version_arg=$(git describe HEAD)
     else  # Retrieve the requested version (tag) of the source code
         version_arg="v$AUTOMATION_VERSION"
         if [[ "$AUTOMATION_VERSION" == "latest" ]]; then
@@ -142,10 +134,20 @@ exec_installer() {
         msg "Attempting to clone branch/tag '$version_arg'"
         dbg "Cloning from $AUTOMATION_REPO_URL into \$TEMPDIR"
         git clone --quiet --branch "$version_arg" \
-            --depth 1 --config advice.detachedHead=false \
+            --config advice.detachedHead=false \
             "$AUTOMATION_REPO_URL" "$TEMPDIR/."
-        cd "$TEMPDIR"
     fi
+
+    dbg "Now working from \$TEMPDIR"
+    cd "$TEMPDIR"
+    msg "Retrieving complete version information for local repository"
+    if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
+        $OOE git fetch --unshallow --tags
+    else
+        $OOE git fetch --tags
+    fi
+    msg "Attempting to rettrieve actual version based on all configured remotes"
+    version_arg=$(git describe HEAD)
 
     # Full path is required so script can find and install itself
     DOWNLOADED_INSTALLER="$TEMPDIR/bin/$SCRIPT_FILENAME"
