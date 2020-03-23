@@ -62,7 +62,7 @@ test_cmd() {
     shift 3
 
     if ((TEST_DEBUG)); then
-        echo "# $@"
+        echo "# $@" > /dev/stderr
     fi
 
     # Using egrep vs file safer than shell builtin test
@@ -71,7 +71,7 @@ test_cmd() {
 
     # Use a sub-shell to capture possible function exit call and all output
     set -o pipefail
-    ( set -e; "$@" |& tee "$a_out_f" | tr -s '[:space:]' ' ' &> "${a_out_f}.oneline")
+    ( set -e; DEBUG=$TEST_DEBUG "$@" 0<&- |& tee "$a_out_f" | tr -s '[:space:]' ' ' &> "${a_out_f}.oneline")
     a_exit="$?"
 
     if [[ -n "$e_exit" ]] && [[ $e_exit -ne $a_exit ]]; then
