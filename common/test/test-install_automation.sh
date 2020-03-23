@@ -3,7 +3,7 @@
 # Unit-tests for installation script with common scripts/libraries.
 # Also verifies test script is derived from library filename
 
-TEST_DIR=$(dirname ${BASH_SOURCE[0]})/../../bin
+TEST_DIR=$(realpath "$(dirname ${BASH_SOURCE[0]})/../../bin")
 source $(dirname ${BASH_SOURCE[0]})/testlib.sh || exit 1
 INSTALLER_FILEPATH="$TEST_DIR/$SUBJ_FILENAME"
 TEST_INSTALL_ROOT=$(mktemp -p '' -d "tmp_$(basename $0)_XXXXXXXX")
@@ -33,7 +33,7 @@ test_cmd \
     env _MAGIC_JUJU=TESTING$(uuidgen)TESTING $INSTALLER_FILEPATH 99.99.99
 
 test_cmd \
-    "The installer successfully installs and configures \$TEST_INSTALL_ROOT" \
+    "The installer successfully installs and configures into \$INSTALL_PREFIX" \
     0 "Installation complete" \
     $INSTALLER_FILEPATH 0.0.0
 
