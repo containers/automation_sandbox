@@ -11,6 +11,7 @@ jobs:
                   # Testing installer requires a full repo. history
                   fetch-depth: 0
                   path: ./
+            - run: git fetch --tags
             - run: $GITHUB_WORKSPACE/bin/run_all_tests.sh
               # env:
               #     TEST_DEBUG: 'true'

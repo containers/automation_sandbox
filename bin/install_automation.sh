@@ -1,6 +1,7 @@
 #!/bin/bash
 
 set -e
+set +x
 
 # Installs and configures common automation scripts and libraries in
 # the environment where it was executed.  Intended to be downloaded
@@ -19,7 +20,8 @@ set -e
 # FIXME: Should be automation, not automation_sandbox
 AUTOMATION_REPO_URL=${AUTOMATION_REPO_URL:-https://github.com/containers/automation_sandbox.git}
 AUTOMATION_REPO_BRANCH=${AUTOMATION_REPO_BRANCH:-master}
-SCRIPT_FILENAME=$(basename $0)
+# This must be hard-coded for executing via pipe to bash
+SCRIPT_FILENAME=install_automation.sh
 # The source version requested for installing
 AUTOMATION_VERSION="$1"
 # Set non-zero to enable

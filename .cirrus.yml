@@ -7,10 +7,13 @@ container:
 
 # Actual testing task for code in this repo.
 cirrus-ci/actual_test_task:
+    env:
+        CIRRUS_CLONE_DEPTH: 0
     setup_script:
         - microdnf update -y
         - microdnf install findutils git jq
     test_script:
+        - git fetch --tags
         - $CIRRUS_WORKING_DIR/bin/run_all_tests.sh
 
 

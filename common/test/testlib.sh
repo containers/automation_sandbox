@@ -71,7 +71,7 @@ test_cmd() {
 
     # Use a sub-shell to capture possible function exit call and all output
     set -o pipefail
-    ( set -e; DEBUG=$TEST_DEBUG "$@" 0<&- |& tee "$a_out_f" | tr -s '[:space:]' ' ' &> "${a_out_f}.oneline")
+    ( set -e; "$@" 0<&- |& tee "$a_out_f" | tr -s '[:space:]' ' ' &> "${a_out_f}.oneline")
     a_exit="$?"
 
     if [[ -n "$e_exit" ]] && [[ $e_exit -ne $a_exit ]]; then
