@@ -97,7 +97,7 @@ export PATH="\${PATH:+\$PATH:}$actual_inst_path/bin"
 EOF
     if ((am_root)); then
         msg "Installing example environment files system-wide"
-        install -v $inst_perm_arg -D -t "$(dirname /$spp)" "./environment"
+        install -v $inst_perm_arg "./environment" "$(dirname /$spp)"
     fi
 
     echo -n "Installation complete for " > /dev/stderr
