@@ -24,6 +24,7 @@ AUTOMATION_REPO_BRANCH=${AUTOMATION_REPO_BRANCH:-master}
 SCRIPT_FILENAME=install_automation.sh
 # The source version requested for installing
 AUTOMATION_VERSION="$1"
+shift || true  # ignore if no more args
 # Set non-zero to enable
 DEBUG=${DEBUG:-0}
 # Save a bit of typin
@@ -161,7 +162,7 @@ exec_installer() {
             AUTOMATION_REPO_URL="$AUTOMATION_REPO_URL" \
             AUTOMATION_REPO_BRANCH="$AUTOMATION_REPO_BRANCH" \
             _MAGIC_JUJU="$_DEFAULT_MAGIC_JUJU" \
-            /bin/bash "$DOWNLOADED_INSTALLER" "$version_arg"
+            /bin/bash "$DOWNLOADED_INSTALLER" "$version_arg" $_ARGS
     else
         msg "Error: '$DOWNLOADED_INSTALLER' does not exist or is not executable" > /dev/stderr
         # Allow exi
@@ -171,15 +172,14 @@ exec_installer() {
 
 check_args() {
     local arg_rx="^($AUTOMATION_REPO_BRANCH)|^(latest)|^(v?[0-9]+\.[0-9]+\.[0-9]+(-.+)?)"
-    dbg "Debugging enabled; Command-line was '$0${_ARGS:+ $_ARGS}'"
+    dbg "Debugging enabled; Command-line was '$0${AUTOMATION_VERSION:+ $AUTOMATION_VERSION}${_ARGS:+ $_ARGS}'"
     dbg "Argument validation regular-expresion '$arg_rx'"
     if [[ -z "$AUTOMATION_VERSION" ]]; then
         msg "Error: Must specify the version number to install, as the first and only argument."
         msg "       Use version '$MAGIC_LOCAL_VERSION' to install from local source."
         msg "       Use version 'latest' to install from current upstream"
         exit 2
-    elif ! echo "$AUTOMATION_VERSION" | \
-        egrep -q "$arg_rx"; then
+    elif ! echo "$AUTOMATION_VERSION" | egrep -q "$arg_rx"; then
             msg "Error: '$AUTOMATION_VERSION' does not appear to be a valid version number"
             exit 4
     fi
@@ -200,6 +200,24 @@ elif [[ "$_MAGIC_JUJU" == "$_DEFAULT_MAGIC_JUJU" ]]; then
     dbg "Operating in actual install mode (ID $_MAGIC_JUJU)"
     # Running from $TEMPDIR in requested version of source
     $_MAGIC_JUJU
+
+    # Validate the common library can load
+    source "$INSTALL_PREFIX/automation/lib/anchors.sh"
+
+    # Additional arguments specify subdirectories to check and chain to their installer script
+    for arg in $_ARGS; do
+        CHAIN_TO="$TEMPDIR/$arg/.install.sh"
+        if [[ -r "$CHAIN_TO" ]]; then
+            msg "     "
+            msg "Chaining to additional install script for $arg"
+            # Cannot assume common was installed system-wide
+            env AUTOMATION_LIB_PATH=$AUTOMATION_LIB_PATH \
+                DEBUG=$DEBUG \
+                /bin/bash $CHAIN_TO
+        else
+            msg "Warning: Cannot find installer for $CHAIN_TO"
+        fi
+    done
 else # Something has gone horribly wrong
     msg "Error: The executed installer script is incompatible with source version $AUTOMATION_VERSION"
     msg "Please obtain and use a newer version of $SCRIPT_FILENAME which supports ID $_MAGIC_JUJU"

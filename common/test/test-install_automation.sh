@@ -74,7 +74,7 @@ test_cmd \
 
 test_cmd \
     "The installed installer, can update itself to the latest upstream version" \
-    0 "Installation complete" \
+    0 "Installation complete for v[0-9]+\.[0-9]+\.[0-9]+" \
     execute_in_example_environment $SUBJ_FILENAME latest
 
 # Must be last call
