@@ -1,21 +1,12 @@
 ---
 
-on: [push, pull_request]
+on:
+    reease:
+        types: published
 
 jobs:
-    actual_test:
-        runs-on: ubuntu-latest
-        steps:
-            - uses: actions/checkout@v2
-              with:
-                  # Testing installer requires a full repo. history
-                  fetch-depth: 0
-                  path: ./
-            - run: git fetch --tags
-            - run: $GITHUB_WORKSPACE/bin/run_all_tests.sh
-              # env:
-              #     TEST_DEBUG: 'true'
-    test_build:
+    # TODO: Add a section for an actual tagged release
+    latest:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v2
@@ -26,6 +17,14 @@ jobs:
                     -f cirrus-ci_retrospective/Dockerfile \
                     --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
                     ./
+            - shell: bash
+              env:
+                  DOCKER_CONFIG_JSON: ${{secrets.DOCKER_CONFIG_JSON}}
+              run: |
+                  trap "history -c" EXIT
+                  mkdir -p $HOME/.docker
+                  echo "$DOCKER_CONFIG_JSON" > $HOME/.docker/config.json
+            - run: docker push quay.io/libpod/cirrus-ci_retrospective:latest
     debug:
         runs-on: ubuntu-latest
         steps:
