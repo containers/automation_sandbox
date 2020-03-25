@@ -14,7 +14,7 @@ jobs:
             # There is no other source or method to parse the tag from github.ref or event JSON :S
             - id: get_tag
               shell: bash
-            - run: printf "::set-output name=TAG_NAME::%s" $(basename $GITHUB_REF)
+              run: printf "::set-output name=TAG_NAME::%s" $(basename $GITHUB_REF)
             - id: show_tag
               run: echo "${{ steps.get_tag.outputs.TAG_NAME }}"
             - id: create_release  # Referenced by upload-release-asset below
