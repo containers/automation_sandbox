@@ -21,10 +21,8 @@ jobs:
         needs:
             - tag_name
         runs-on: ubuntu-latest
-        env:
-            # Set by tag_name job (above)
-            TAG_NAME:
         steps:
+            - run: echo "$TAG_NAME"
             - id: create_release  # Referenced by upload-release-asset below
               uses: actions/create-release@v1.0.1
               env:
