@@ -1,19 +1,24 @@
 ---
 
+# see publish_release.yml
 on:
     release:
         types: published
 
 jobs:
-    # TODO: Add a section for an actual tagged release
-    latest:
+    container_image:
         runs-on: ubuntu-latest
+        env:
+            REGISTRY: quay.io
+            REPO_USER: libpod
+            REPO_NAME: cirrus-ci_retrospective
+            TAG_NAME: ${{ github.event.release.tag_name }}
         steps:
             - uses: actions/checkout@v2
               with:
                   path: ./
             - run: >-
-                docker build -t quay.io/libpod/cirrus-ci_retrospective:latest \
+                docker build -t $REGISTRY/$REPO_USER/$REPO_NAME:latest
                     -f cirrus-ci_retrospective/Dockerfile \
                     --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
                     ./
@@ -24,7 +29,11 @@ jobs:
                   trap "history -c" EXIT
                   mkdir -p $HOME/.docker
                   echo "$DOCKER_CONFIG_JSON" > $HOME/.docker/config.json
-            - run: docker push quay.io/libpod/cirrus-ci_retrospective:latest
+            - run: |
+                  docker tag $REGISTRY/$REPO_USER/$REPO_NAME:latest \
+                             $REGISTRY/$REPO_USER/$REPO_NAME:$TAG_NAME
+                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:$TAG_NAME && \
+                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:latest
     debug:
         runs-on: ubuntu-latest
         steps:

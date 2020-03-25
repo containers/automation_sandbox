@@ -1,0 +1,39 @@
+---
+
+on:
+  push:
+      branches:
+          - master
+      tags:
+          - 'v??.??.??*'
+
+jobs:
+    release:
+        runs-on: ubuntu-latest
+        steps:
+            - id: create_release  # Referenced by upload-release-asset below
+              uses: actions/create-release@v1.0.1
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                tag_name: ${{ github.ref }}
+                release_name: ${{ github.ref }}
+            - uses: actions/checkout@v2
+              with:
+                  path: ./
+            - uses: actions/upload-release-asset@v1.0.2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+              with:
+                  upload_url: ${{ steps.create_release.outputs.upload_url }}
+                  asset_path: ./bin/install_automation.sh
+                  asset_name: install_automation.sh
+                  asset_content_type: application/octet-stream
+    debug:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/upload-artifact@v1.0.0
+              with:
+                  # There is no way to avoid this being zipped :(
+                  name: event.json.zip
+                  path: ${{ github.event_path }}

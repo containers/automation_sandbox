@@ -141,11 +141,11 @@ exec_installer() {
 
     dbg "Now working from \$TEMPDIR"
     cd "$TEMPDIR"
-    msg "Retrieving complete version information for local repository"
+    msg "Retrieving complete version information for temp. repo. clone"
     if [[ "$(git rev-parse --is-shallow-repository)" == "true" ]]; then
-        $OOE git fetch --unshallow --tags
+        $OOE git fetch --unshallow --tags --force
     else
-        $OOE git fetch --tags
+        $OOE git fetch --tags --force
     fi
     msg "Attempting to rettrieve actual version based on all configured remotes"
     version_arg=$(git describe HEAD)
