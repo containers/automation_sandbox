@@ -2,13 +2,14 @@
 
 on:
   push:
-      branches:
-          - master
+      # ref: https://help.github.com/en/actions/reference/events-that-trigger-workflows#example-using-multiple-events-with-activity-types-or-configuration
       tags:
           - 'v*'
 
 jobs:
     release:
+        # Trigger pattern 'v*' (above) begs for additional precision
+        if: startsWith(github.ref, 'v') && contains(github.ref, '.')
         runs-on: ubuntu-latest
         steps:
             - id: create_release  # Referenced by upload-release-asset below
@@ -16,7 +17,7 @@ jobs:
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: ${{ github.ref }}
+                tag_name: ${{ github.ref }}  # branch or tag name
                 release_name: ${{ github.ref }}
             - uses: actions/checkout@v2
               with:

@@ -2,8 +2,10 @@
 
 # see publish_release.yml
 on:
+    # ref: https://help.github.com/en/actions/reference/events-that-trigger-workflows#release-event-release
     release:
-        types: published
+        types:
+            - published
 
 jobs:
     container_image:
@@ -12,7 +14,6 @@ jobs:
             REGISTRY: quay.io
             REPO_USER: libpod
             REPO_NAME: cirrus-ci_retrospective
-            TAG_NAME: ${{ github.event.release.tag_name }}
         steps:
             - uses: actions/checkout@v2
               with:
@@ -29,10 +30,11 @@ jobs:
                   trap "history -c" EXIT
                   mkdir -p $HOME/.docker
                   echo "$DOCKER_CONFIG_JSON" > $HOME/.docker/config.json
+            # $GITHUB_REF guaranteed to be the tag name
             - run: |
                   docker tag $REGISTRY/$REPO_USER/$REPO_NAME:latest \
-                             $REGISTRY/$REPO_USER/$REPO_NAME:$TAG_NAME
-                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:$TAG_NAME && \
+                             $REGISTRY/$REPO_USER/$REPO_NAME:$GITHUB_REF
+                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:$GITHUB_REF && \
                   docker push $REGISTRY/$REPO_USER/$REPO_NAME:latest
     debug:
         runs-on: ubuntu-latest
