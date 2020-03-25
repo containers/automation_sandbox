@@ -44,7 +44,7 @@ jobs:
               with:
                   path: ./
             - run: >-
-                docker build -t $REGISTRY/$REPO_USER/$REPO_NAME:latest
+                docker build -t $REGISTRY/$REPO_USER/$REPO_NAME:latest \
                     -f cirrus-ci_retrospective/Dockerfile \
                     --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
                     ./
