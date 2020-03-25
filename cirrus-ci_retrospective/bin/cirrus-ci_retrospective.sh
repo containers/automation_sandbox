@@ -122,4 +122,4 @@ do
 done
 
 dbg "# Combining and pretty-formatting all task data as JSON list into $OUTPUT_JSON_FILE"
-jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT > "$OUTPUT_JSON_FILE"
+jq --indent 4 --slurp '.' $GITHUB_WORKSPACE/.*$INTERMEDIATE_OUTPUT_EXT > "$OUTPUT_JSON_FILE"

@@ -182,4 +182,7 @@ verify_env_vars() {
 
     [[ -n "$GITHUB_TOKEN" ]] || \
         die "Expecting non-empty \$GITHUB_TOKEN" 2
+
+    [[ -d "$GITHUB_WORKSPACE" ]] || \
+        die "Expecting \$$GITHUB_WORKSPACE '$GITHUB_WORKSPACE' to be a directory"
 }
