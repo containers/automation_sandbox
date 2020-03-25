@@ -3,7 +3,8 @@
 on:
     check_suite:  # ALWAYS triggered from the default branch
         # Ref: https://help.github.com/en/actions/reference/events-that-trigger-workflows#check-suite-event-check_suite
-        types: [completed]
+        types:
+            - completed
 
 jobs:
     cirrus-ci_retrospective:
@@ -29,7 +30,7 @@ jobs:
                   # There is no way to avoid this being zipped :(
                   name: cirrus-ci_retrospective.json.zip
                   # Script (above) generate this filename
-                  path: ./cirrus-ci_retrospective.json
+                  path: $GITHUB_WORKSPACE/cirrus-ci_retrospective.json
     debug:
         # Avoid useless executions
         if: github.event.check_suite.app.name == 'Cirrus CI'

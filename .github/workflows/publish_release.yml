@@ -7,18 +7,31 @@ on:
           - 'v*'
 
 jobs:
-    release:
+    # There is no other source or method to parse this from github.ref or event JSON :S
+    tag_name:
         # Trigger pattern 'v*' (above) begs for additional precision
-        if: startsWith(github.ref, 'v') && contains(github.ref, '.')
+        if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref, '.')
         runs-on: ubuntu-latest
+        steps:
+            # Ref: https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-an-environment-variable
+            - shell: bash
+              run: >-
+                printf "::set-env name=TAG_NAME::%s" $(basename "${{ github.ref }}")
+    release:
+        needs:
+            - tag_name
+        runs-on: ubuntu-latest
+        env:
+            # Set by tag_name job (above)
+            TAG_NAME:
         steps:
             - id: create_release  # Referenced by upload-release-asset below
               uses: actions/create-release@v1.0.1
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
               with:
-                tag_name: ${{ github.ref }}  # branch or tag name
-                release_name: ${{ github.ref }}
+                tag_name: ${{ env.TAG_NAME }}
+                release_name: ${{ env.TAG_NAME }}
             - uses: actions/checkout@v2
               with:
                   path: ./
