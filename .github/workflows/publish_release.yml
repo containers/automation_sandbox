@@ -15,8 +15,6 @@ jobs:
             - id: get_tag
               shell: bash
               run: printf "::set-output name=TAG_NAME::%s" $(basename $GITHUB_REF)
-            - id: show_tag
-              run: echo "${{ steps.get_tag.outputs.TAG_NAME }}"
             - id: create_release  # Referenced by upload-release-asset below
               uses: actions/create-release@v1.0.1
               env:
@@ -35,6 +33,36 @@ jobs:
                   asset_path: ./bin/install_automation.sh
                   asset_name: install_automation.sh
                   asset_content_type: application/octet-stream
+    container_image:
+        runs-on: ubuntu-latest
+        env:
+            REGISTRY: quay.io
+            REPO_USER: libpod
+            REPO_NAME: cirrus-ci_retrospective
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  path: ./
+            - run: >-
+                docker build -t $REGISTRY/$REPO_USER/$REPO_NAME:latest
+                    -f cirrus-ci_retrospective/Dockerfile \
+                    --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
+                    ./
+            - shell: bash
+              env:
+                  DOCKER_CONFIG_JSON: ${{secrets.DOCKER_CONFIG_JSON}}
+              run: |
+                  trap "history -c" EXIT
+                  mkdir -p $HOME/.docker
+                  echo "$DOCKER_CONFIG_JSON" > $HOME/.docker/config.json
+            - id: get_tag
+              shell: bash
+              run: printf "::set-output name=TAG_NAME::%s" $(basename $GITHUB_REF)
+            - run: |
+                  docker tag $REGISTRY/$REPO_USER/$REPO_NAME:latest \
+                             $REGISTRY/$REPO_USER/$REPO_NAME:${{ steps.get_tag.outputs.TAG_NAME }}
+                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:${{ steps.get_tag.outputs.TAG_NAME }} && \
+                  docker push $REGISTRY/$REPO_USER/$REPO_NAME:latest
     debug:
         runs-on: ubuntu-latest
         steps:
