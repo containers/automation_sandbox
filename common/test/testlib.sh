@@ -6,10 +6,18 @@
 # Set non-zero to enable
 TEST_DEBUG=${TEST_DEBUG:-0}
 
-# Unit-tests for library with a similar name
-TEST_FILENAME=$(basename $0)  # prefix-replace needs this as a variable
-SUBJ_FILENAME="${TEST_FILENAME#test-}"; unset TEST_FILENAME
-TEST_DIR="${TEST_DIR:-$(dirname $0)/../lib}"
+# Test subject filename and directory name are derrived from test-script filename
+SUBJ_FILENAME=$(basename $0)
+if [[ "$SUBJ_FILENAME" =~ "testlib-" ]]; then
+    SUBJ_FILENAME="${SUBJ_FILENAME#testlib-}"
+    TEST_DIR="${TEST_DIR:-$(dirname $0)/../lib}"
+elif [[ "$SUBJ_FILENAME" =~ "testbin-" ]]; then
+    SUBJ_FILENAME="${SUBJ_FILENAME#testbin-}"
+    TEST_DIR="${TEST_DIR:-$(dirname $0)/../bin}"
+else
+    echo "Unable to handle script filename/prefix '$SUBJ_FILENAME'"
+    exit 9
+fi
 
 # Always run all tests, and keep track of failures.
 FAILURE_COUNT=0

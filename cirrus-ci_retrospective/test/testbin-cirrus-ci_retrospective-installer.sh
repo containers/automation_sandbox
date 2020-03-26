@@ -3,6 +3,7 @@
 # Load standardized test harness
 source $(dirname "${BASH_SOURCE[0]}")/testlib.sh || exit 1
 
+# Must go through the top-level install script that chains to ../.install.sh
 INSTALL_SCRIPT=$(realpath "$TEST_DIR/../../bin/install_automation.sh")
 TEMPDIR=$(mktemp -p "" -d "tmpdir_cirrus-ci_retrospective_XXXXX")
 trap "rm -rf $TEMPDIR" EXIT
