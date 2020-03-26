@@ -124,8 +124,8 @@ do
           }
         }" \
         '.' \
-        '-n @@@@' >> "$output_json"
+        '-n @@@@' | jq --indent 4 '.data' > "$output_json"
 done
 
-dbg "# Combining and pretty-formatting all task data as JSON list into $OUTPUT_JSON_FILE"
+dbg "# Combining all task data into JSON list as action output and into $OUTPUT_JSON_FILE"
 jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT > "$OUTPUT_JSON_FILE"
