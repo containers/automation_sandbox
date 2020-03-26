@@ -124,7 +124,7 @@ do
           }
         }" \
         '.' \
-        '-n @@@@' | jq --indent 4 '.data' > "$output_json"
+        '-n @@@@' | jq --indent 4 '.data.task' > "$output_json"
 done
 
 dbg "# Combining all task data into JSON list as action output and into $OUTPUT_JSON_FILE"
