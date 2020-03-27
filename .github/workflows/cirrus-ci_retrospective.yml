@@ -38,6 +38,12 @@ jobs:
                   fi
                   printf "::set-output name=sha::%d" "$sha"
 
+            - if: always()
+              run: |
+                  echo "${{ steps.retro.outputs.was_pr }}"
+                  echo "${{ steps.retro.outputs.prn }}"
+                  echo "${{ steps.retro.outputs.sha }}"
+
             - if: steps.retro.outputs.was_pr == 'true'
               uses: actions/checkout@v2
               with:
