@@ -79,10 +79,9 @@ jobs:
                   cd pull_request
                   github_event_dirpath=$(dirname "${{ github.event_path }}")
                   /usr/bin/docker run --rm \
-                      -e GITHUB_TOKEN -e GITHUB_EVENT_PATH=/github/workspace/events.json \
-                      -e GITHUB_ACTIONS=true \
-                      -v $github_event_dirpath:/github/workflow:ro \
+                      -e GITHUB_TOKEN -e GITHUB_EVENT_PATH -e GITHUB_ACTIONS=true \
                       -v "$PWD":"/github/workspace" \
+                      -v $github_event_dirpath:/github/workflow:ro \
                       --entrypoint=/bin/bash test_container \
                       -c "source /etc/profile && exec /usr/share/automation/bin/debug.sh" \
                       &> ../test_artifacts/debug_output.txt
