@@ -17,7 +17,7 @@ fi
 verify_env_vars
 
 INTERMEDIATE_OUTPUT_EXT=".json_item"
-OUTPUT_JSON_FILE="${OUTPUT_JSON_FILE:-$GITHUB_WORKSPACE}/${SCRIPT_FILENAME%.sh}.json"
+OUTPUT_JSON_FILE="${OUTPUT_JSON_FILE:-$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json}"
 
 # Confirm expected triggering event and type
 jq --exit-status 'has("check_suite")' < "$GITHUB_EVENT_PATH" || \
