@@ -39,7 +39,8 @@ jobs:
                   $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
                     ./cirrus-ci_retrospective.json)
 
-            - run: echo "${{ steps.success_sha.outputs.value }}"
+            - if: "!contains(steps.success_pr.outputs.value, 'null')"
+              run: echo "${{ steps.success_sha.outputs.value }}"
 
             - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
               uses: actions/checkout@v2
