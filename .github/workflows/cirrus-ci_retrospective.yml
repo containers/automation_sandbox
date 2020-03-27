@@ -14,7 +14,8 @@ jobs:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
+            - id: cirrus-ci_retrospective
+              uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
@@ -29,20 +30,22 @@ jobs:
                   name: cirrus-ci_retrospective.json.zip
                   path: ./cirrus-ci_retrospective.json
 
+            - run: echo '${{ steps.cirrus-ci_retrospective.outputs.json }}'
+
             - id: get_success_sha
               shell: bash
               run: >-
-                  printf
-                  "::set-output name=value::%s"
-                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo'
+                  printf \
+                  "::set-output name=value::%s" \
+                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
                     ./cirrus-ci_retrospective.json)
 
             - id: get_success_pr
               shell: bash
               run: >-
-                  printf
-                  "::set-output name=value::%s"
-                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest'
+                  printf \
+                  "::set-output name=value::%s" \
+                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' \
                     ./cirrus-ci_retrospective.json)
 
             # pullRequest is 'null' when Cirrus-CI build was NOT a pull request
