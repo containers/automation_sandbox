@@ -19,10 +19,6 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            # Help debug any problems from above
-            # N/B: This output can't be used as JSON anywhere in GH Action YAML
-            - run: echo '${{ toJSON(steps.cirrus-ci_retrospective.outputs.json) }}'
-
             - id: success_pr
               shell: bash
               run: >-
@@ -31,9 +27,9 @@ jobs:
                   $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' \
                     ./cirrus-ci_retrospective.json)
 
-            # pullRequest is 'null' when Cirrus-CI build was NOT a pull request
-            # Github will coerces 'null' to '0'
-            - if: steps.success_pr.outputs.value
+            - run: echo "${{ steps.success_pr.outputs.value }}"
+
+            - if: "!contains(steps.success_pr.outputs.value, 'null')"
               # Needed to clone the code from PR HEAD
               id: success_sha
               shell: bash
@@ -43,14 +39,16 @@ jobs:
                   $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
                     ./cirrus-ci_retrospective.json)
 
-            - if: steps.success_pr.outputs.value
+            - run: echo "${{ steps.success_sha.outputs.value }}"
+
+            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
               uses: actions/checkout@v2
               with:
                   ref: ${{ steps.success_sha.value }}
                   path: ./
 
             # Execute the PR's version of the cirrus-ci_retrospective script in debugging mode
-            - if: steps.success_pr.outputs.value
+            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
               run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/debug.sh &> $GITHUB_WORKSPACE/debug.output
               env:
                 GITHUB_EVENT_PATH: ${{ github.event_path }}
@@ -58,7 +56,7 @@ jobs:
                 GITHUB_TOKEN: ${{ github.token }}
                 DEBUG: 'true'
 
-            - if: steps.success_pr.outputs.value
+            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
               uses: actions/upload-artifact@v1.0.0
               with:
                   name: cirrus-ci_retrospective.json.zip
@@ -66,7 +64,7 @@ jobs:
 
             # FIXME: Just a stub
             # Provide the output and a link as feedback to the PR author
-            - if: steps.success_pr.outputs.value
+            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
               shell: bash
               run: cat ./debug.output
 
