@@ -56,7 +56,7 @@ jobs:
               run: |
                   mkdir -p test_artifacts
                   cd pull_request
-                  git fetch origin "${{ steps.retro.output.sha }}"
+                  git fetch origin "${{ steps.retro.outputs.sha }}"
                   git checkout -b 'pr${{ steps.retro.outputs.prn }}' FETCH_HEAD
                   git log -1 | tee ../test_artifacts/commit.txt
 
