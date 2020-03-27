@@ -36,7 +36,7 @@ jobs:
                       printf "\n::set-output name=was_pr::false\n"
                       printf "\n::set-output name=prn::null\n"
                   fi
-                  printf "\n::set-output name=sha::%d\n" "$sha"
+                  printf "\n::set-output name=sha::%s\n" "$sha"
 
             - if: always()
               run: |
