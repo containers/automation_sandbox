@@ -30,13 +30,14 @@ jobs:
                   set -exuo pipefail
                   prn=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
                   sha=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
-                  printf "::set-output name=was_pr::false"
-                  printf "::set-output name=prn::null"
-                  printf "::set-output name=sha::%d" "$sha"
                   if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
                       printf "::set-output name=was_pr::true"
                       printf "::set-output name=prn::%d" "$prn"
+                  else
+                      printf "::set-output name=was_pr::false"
+                      printf "::set-output name=prn::null"
                   fi
+                  printf "::set-output name=sha::%d" "$sha"
 
             - if: steps.retro.outputs.was_pr == 'true'
               uses: actions/checkout@v2
