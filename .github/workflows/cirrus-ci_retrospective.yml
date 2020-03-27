@@ -27,7 +27,6 @@ jobs:
             - id: retro
               shell: bash
               run: |
-                  set -exuo pipefail
                   prn=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
                   sha=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
                   if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
