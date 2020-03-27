@@ -17,7 +17,7 @@ fi
 verify_env_vars
 
 INTERMEDIATE_OUTPUT_EXT=".json_item"
-OUTPUT_JSON_FILE="${OUTPUT_JSON_FILE:-$GITHUB_WORKSPACE}/${SCRIPT_FILENAME%.sh}.json"
+OUTPUT_JSON_FILE="${OUTPUT_JSON_FILE:-$GITHUB_WORKSPACE/${SCRIPT_FILENAME%.sh}.json}"
 
 # Confirm expected triggering event and type
 jq --exit-status 'has("check_suite")' < "$GITHUB_EVENT_PATH" || \
@@ -129,6 +129,8 @@ done
 
 dbg "# Combining all task data into JSON list as action output and into $OUTPUT_JSON_FILE"
 # Github Actions handles this prefix specially:  Ensure stdout JSON is all on one line.
+# N/B: It is not presently possible to actually _use_ this output value as JSON in
+#      a github actions workflow.
 printf "::set-output name=json::'%s'" \
     $(jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT | \
       tee "$OUTPUT_JSON_FILE" | \

@@ -19,55 +19,74 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            - id: success_pr
-              shell: bash
-              run: >-
-                  printf \
-                  "::set-output name=value::%s" \
-                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' \
-                    ./cirrus-ci_retrospective.json)
-
-            - run: echo "${{ steps.success_pr.outputs.value }}"
-
-            - if: "!contains(steps.success_pr.outputs.value, 'null')"
-              # Needed to clone the code from PR HEAD
-              id: success_sha
-              shell: bash
-              run: >-
-                  printf \
-                  "::set-output name=value::%s" \
-                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
-                    ./cirrus-ci_retrospective.json)
-
-            - if: "!contains(steps.success_pr.outputs.value, 'null')"
-              run: echo "${{ steps.success_sha.outputs.value }}"
-
-            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
-              uses: actions/checkout@v2
-              with:
-                  ref: ${{ steps.success_sha.value }}
-                  path: ./
-
-            # Execute the PR's version of the cirrus-ci_retrospective script in debugging mode
-            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
-              run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/debug.sh &> $GITHUB_WORKSPACE/debug.output
-              env:
-                GITHUB_EVENT_PATH: ${{ github.event_path }}
-                GITHUB_WORKSPACE: ${{ github.workspace }}
-                GITHUB_TOKEN: ${{ github.token }}
-                DEBUG: 'true'
-
-            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
-              uses: actions/upload-artifact@v1.0.0
+            - uses: actions/upload-artifact@v1.0.0
               with:
                   name: cirrus-ci_retrospective.json.zip
                   path: ./cirrus-ci_retrospective.json
 
-            # FIXME: Just a stub
-            # Provide the output and a link as feedback to the PR author
-            - if: "!contains(steps.success_pr.outputs.value, 'null') && !contains(steps.success_sha.outputs.value, 'null')"
+            - id: retro
               shell: bash
-              run: cat ./debug.output
+              run: |
+                  set -exuo pipefail
+                  prn=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
+                  sha=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
+                  printf "::set-output name=was_pr::false"
+                  printf "::set-output name=prn::null"
+                  printf "::set-output name=sha::%d" "$sha"
+                  if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
+                      printf "::set-output name=was_pr::true"
+                      printf "::set-output name=prn::%d" "$prn"
+                  fi
+
+            - if: success() && steps.retro.outputs.was_pr == 'true'
+              uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
+                  path: ./pull_request
+                  # ignored for some inexplicable reason
+                  # ref: ${{ steps.success_sha.value }}
+
+            - if: success() && steps.retro.outputs.was_pr == 'true'
+              run: |
+                  mkdir -p test_artifacts
+                  cd pull_request
+                  git fetch origin "${{ steps.success_sha.value }}"
+                  git checkout -b 'pr${{ steps.success_pr.outputs.value}}' FETCH_HEAD
+                  git log -1 | tee ../test_artifacts/commit.txt
+
+            - if: success() && steps.retro.outputs.was_pr == 'true'
+              run: |
+                  cd pull_request
+                  docker build -t test_container \
+                        -f cirrus-ci_retrospective/Dockerfile \
+                        --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
+                        ./ &> ../test_artifacts/build_output.txt
+              #   TODO: Not sure if this is helpful to have or not
+              #   docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
+
+            - if: success() && steps.retro.outputs.was_pr == 'true'
+              env:
+                  GITHUB_EVENT_PATH: /github/workflow/event.json
+                  GITHUB_WORKSPACE: /github/workspace
+                  GITHUB_TOKEN: ${{ github.token }}
+              run: |
+                  cd pull_request
+                  /usr/bin/docker run -it --rm \
+                      -e GITHUB_TOKEN -e GITHUB_EVENT_PATH -e GITHUB_ACTIONS=true \
+                      -v $(dirname "${{ github.event_path }}"):"/github/workflow":ro \
+                      -v "$PWD":"/github/workspace" \
+                      --entrypoint=/bin/bash test_container \
+                      -c "source /etc/profile && exec /usr/share/automation/bin/debug.sh" \
+                      &> ../test_artifacts/debug_output.txt
+                  mv ./cirrus-ci_retrospective.json ../test_artifacts/ || true
+
+            - if: always() && steps.retro.outputs.was_pr == 'true'
+              uses: actions/upload-artifact@v1.0.0
+              with:
+                  name: test_artifacts.zip
+                  path: ./test_artifacts
+
+            # TODO: Post link for test_artifacts.zip into a comment of PR
 
     debug:
         # Avoid useless executions
