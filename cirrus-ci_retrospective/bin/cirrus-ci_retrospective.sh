@@ -132,4 +132,4 @@ dbg "# Combining all task data into JSON list as action output and into $OUTPUT_
 printf "::set-output name=json::%s" \
     $(jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT | \
       tee "$OUTPUT_JSON_FILE" | \
-      jq --compact-output --indent=0)
+      jq --compact-output '.')
