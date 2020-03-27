@@ -38,7 +38,7 @@ jobs:
                       printf "::set-output name=prn::%d" "$prn"
                   fi
 
-            - if: success() && steps.retro.outputs.was_pr == 'true'
+            - if: steps.retro.outputs.was_pr == 'true'
               uses: actions/checkout@v2
               with:
                   fetch-depth: 0
@@ -46,7 +46,7 @@ jobs:
                   # ignored for some inexplicable reason
                   # ref: ${{ steps.success_sha.value }}
 
-            - if: success() && steps.retro.outputs.was_pr == 'true'
+            - if: steps.retro.outputs.was_pr == 'true'
               run: |
                   mkdir -p test_artifacts
                   cd pull_request
@@ -54,7 +54,7 @@ jobs:
                   git checkout -b 'pr${{ steps.success_pr.outputs.value}}' FETCH_HEAD
                   git log -1 | tee ../test_artifacts/commit.txt
 
-            - if: success() && steps.retro.outputs.was_pr == 'true'
+            - if: steps.retro.outputs.was_pr == 'true'
               run: |
                   cd pull_request
                   docker build -t test_container \
@@ -64,7 +64,7 @@ jobs:
               #   TODO: Not sure if this is helpful to have or not
               #   docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
 
-            - if: success() && steps.retro.outputs.was_pr == 'true'
+            - if: steps.retro.outputs.was_pr == 'true'
               env:
                   GITHUB_EVENT_PATH: /github/workflow/event.json
                   GITHUB_WORKSPACE: /github/workspace
