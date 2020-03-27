@@ -60,7 +60,7 @@ unset _MSGPFX
 export GITHUB_EVENT_PATH
 export GITHUB_EVENT_NAME=check_suite  # Validated above
 export GITHUB_ACTIONS=true            # Mock value from Github Actions
-export GITHUB_WORKSPACE="$REPO_ROOT"  # Normally the default branch is used
+export GITHUB_WORKSPACE="${GITHUB_WORKSPACE:-$SCRIPT_PATH/../../}"
 export DEBUG=1                        # The purpose of this script
 
 $DEBUG_SUBJECT_FILEPATH

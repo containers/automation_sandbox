@@ -19,28 +19,11 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-              with:
-                  # There is no way to avoid this being zipped :(
-                  name: cirrus-ci_retrospective.json.zip
-                  # Script (above) generate this filename inside $GITHUB_WORKSPACE / $PWD
-                  path: ./cirrus-ci_retrospective.json
+            # Help debug any problems from above
+            # N/B: This output can't be used as JSON anywhere in GH Action YAML
+            - run: echo '${{ toJSON(steps.cirrus-ci_retrospective.outputs.json) }}'
 
-            - uses: actions/upload-artifact@v1.0.0
-              with:
-                  name: cirrus-ci_retrospective.json.zip
-                  path: ./cirrus-ci_retrospective.json
-
-            - run: echo '${{ steps.cirrus-ci_retrospective.outputs.json }}'
-
-            - id: get_success_sha
-              shell: bash
-              run: >-
-                  printf \
-                  "::set-output name=value::%s" \
-                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
-                    ./cirrus-ci_retrospective.json)
-
-            - id: get_success_pr
+            - id: success_pr
               shell: bash
               run: >-
                   printf \
@@ -50,21 +33,32 @@ jobs:
 
             # pullRequest is 'null' when Cirrus-CI build was NOT a pull request
             # Github will coerces 'null' to '0'
-            - if: steps.get_success_pr.outputs.value
+            - if: steps.success_pr.outputs.value
+              # Needed to clone the code from PR HEAD
+              id: success_sha
+              shell: bash
+              run: >-
+                  printf \
+                  "::set-output name=value::%s" \
+                  $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' \
+                    ./cirrus-ci_retrospective.json)
+
+            - if: steps.success_pr.outputs.value
               uses: actions/checkout@v2
               with:
-                  ref: ${{ steps.get_success_sha.value }}
+                  ref: ${{ steps.success_sha.value }}
                   path: ./
 
-            # Execute the PR version of the cirrus-ci_retrospective script in debugging mode
-            # N/B: This will clobber cirrus-ci_retrospective.json produced above
-            - if: steps.get_success_pr.outputs.value
-              run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/debug.sh
+            # Execute the PR's version of the cirrus-ci_retrospective script in debugging mode
+            - if: steps.success_pr.outputs.value
+              run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/debug.sh &> $GITHUB_WORKSPACE/debug.output
               env:
+                GITHUB_EVENT_PATH: ${{ github.event_path }}
+                GITHUB_WORKSPACE: ${{ github.workspace }}
                 GITHUB_TOKEN: ${{ github.token }}
                 DEBUG: 'true'
 
-            - if: steps.get_success_pr.outputs.value
+            - if: steps.success_pr.outputs.value
               uses: actions/upload-artifact@v1.0.0
               with:
                   name: cirrus-ci_retrospective.json.zip
@@ -72,9 +66,9 @@ jobs:
 
             # FIXME: Just a stub
             # Provide the output and a link as feedback to the PR author
-            - if: steps.get_success_pr.outputs.value
+            - if: steps.success_pr.outputs.value
               shell: bash
-              run: cat ./cirrus-ci_retrospective.json
+              run: cat ./debug.output
 
     debug:
         # Avoid useless executions
