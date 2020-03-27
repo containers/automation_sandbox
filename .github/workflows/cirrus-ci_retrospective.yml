@@ -30,13 +30,13 @@ jobs:
                   prn=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
                   sha=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
                   if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
-                      printf "::set-output name=was_pr::true"
-                      printf "::set-output name=prn::%d" "$prn"
+                      printf "\n::set-output name=was_pr::true\n"
+                      printf "\n::set-output name=prn::%d\n" "$prn"
                   else
-                      printf "::set-output name=was_pr::false"
-                      printf "::set-output name=prn::null"
+                      printf "\n::set-output name=was_pr::false\n"
+                      printf "\n::set-output name=prn::null\n"
                   fi
-                  printf "::set-output name=sha::%d" "$sha"
+                  printf "\n::set-output name=sha::%d\n" "$sha"
 
             - if: always()
               run: |
