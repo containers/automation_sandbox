@@ -128,4 +128,8 @@ do
 done
 
 dbg "# Combining all task data into JSON list as action output and into $OUTPUT_JSON_FILE"
-jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT > "$OUTPUT_JSON_FILE"
+# Github Actions handles this prefix specially:  Ensure stdout JSON is all on one line.
+printf "::set-output name=json::%s" \
+    $(jq --indent 4 --slurp '.' $TMPDIR/.*$INTERMEDIATE_OUTPUT_EXT | \
+      tee "$OUTPUT_JSON_FILE" | \
+      jq --compact-output --indent=0)

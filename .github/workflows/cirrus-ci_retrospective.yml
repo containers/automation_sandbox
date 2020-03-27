@@ -14,14 +14,13 @@ jobs:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - run: docker://quay.io/libpod/cirrus-ci_retrospective:latest
+            - uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            - uses: actions/upload-artifact@v1.0.0
               with:
                   # There is no way to avoid this being zipped :(
-                  name: latest_cirrus-ci_retrospective.json.zip
+                  name: cirrus-ci_retrospective.json.zip
                   # Script (above) generate this filename inside $GITHUB_WORKSPACE / $PWD
                   path: ./cirrus-ci_retrospective.json
 
@@ -52,7 +51,7 @@ jobs:
             # Execute the PR version of the cirrus-ci_retrospective script in debugging mode
             # N/B: This will clobber cirrus-ci_retrospective.json produced above
             - if: steps.get_success_pr.outputs.value
-              run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/cirrus-ci_retrospective.sh
+              run: $GITHUB_WORKSPACE/cirrus-ci_retrospective/bin/debug.sh
               env:
                 GITHUB_TOKEN: ${{ github.token }}
                 DEBUG: 'true'
@@ -60,9 +59,7 @@ jobs:
             - if: steps.get_success_pr.outputs.value
               uses: actions/upload-artifact@v1.0.0
               with:
-                  # There is no way to avoid this being zipped :(
-                  name: pr${{ steps.get_success_pr.outputs.value }}_cirrus-ci_retrospective.json.zip
-                  # Script (above) generate this filename inside $GITHUB_WORKSPACE / $PWD
+                  name: cirrus-ci_retrospective.json.zip
                   path: ./cirrus-ci_retrospective.json
 
             # FIXME: Just a stub
