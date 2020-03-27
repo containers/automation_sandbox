@@ -24,11 +24,17 @@ jobs:
                   # Script (above) generate this filename inside $GITHUB_WORKSPACE / $PWD
                   path: ./cirrus-ci_retrospective.json
 
+            - if: steps.get_success_pr.outputs.value
+              uses: actions/upload-artifact@v1.0.0
+              with:
+                  name: cirrus-ci_retrospective.json.zip
+                  path: ./cirrus-ci_retrospective.json
+
             - id: get_success_sha
               shell: bash
               run: >-
                   printf
-                  "::set-output name=value::%"
+                  "::set-output name=value::%s"
                   $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo'
                     ./cirrus-ci_retrospective.json)
 
@@ -36,7 +42,7 @@ jobs:
               shell: bash
               run: >-
                   printf
-                  "::set-output name=value::%"
+                  "::set-output name=value::%s"
                   $(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest'
                     ./cirrus-ci_retrospective.json)
 
