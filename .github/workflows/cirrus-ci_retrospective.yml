@@ -71,17 +71,16 @@ jobs:
               #   docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
 
             - if: steps.retro.outputs.was_pr == 'true'
-              env:
-                  GITHUB_EVENT_PATH: /github/workflow/event.json
-                  GITHUB_WORKSPACE: /github/workspace
-                  GITHUB_TOKEN: ${{ github.token }}
               run: |
                   cd pull_request
                   github_event_dirpath=$(dirname "${{ github.event_path }}")
                   /usr/bin/docker run --rm \
-                      -e GITHUB_TOKEN -e GITHUB_EVENT_PATH -e GITHUB_ACTIONS=true \
+                      -e GITHUB_TOKEN=${{ github.token }} \
+                      -e GITHUB_EVENT_PATH=/github/workflow/event.json \
+                      -e GITHUB_ACTIONS=true \
+                      -e GITHUB_WORKSPACE=/github/workspace \
                       -v "$PWD":"/github/workspace" \
-                      -v $github_event_dirpath:/github/workflow:ro \
+                      -v $github_event_dirpath:/github/workflow \
                       --entrypoint=/bin/bash test_container \
                       -c "source /etc/profile && exec /usr/share/automation/bin/debug.sh" \
                       &> ../test_artifacts/debug_output.txt
