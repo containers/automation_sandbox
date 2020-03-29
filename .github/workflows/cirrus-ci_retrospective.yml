@@ -1,5 +1,12 @@
 ---
 
+# Use the latest published version of the cirrus-ci_retrospective container
+# to determine the execution context of _this_ workflow run.  If it is a
+# pull request, clone the HEAD used in the Cirrus-CI build.  From the PR
+# code, build a test version of the cirrus-ci_retrospective container,
+# and run it against the originally-triggering Github Actions event.
+# Collect and provide outputs in an archive file for analysis.
+
 on:
     check_suite:  # ALWAYS triggered from the default branch
         # Ref: https://help.github.com/en/actions/reference/events-that-trigger-workflows#check-suite-event-check_suite
@@ -7,26 +14,18 @@ on:
             - completed
 
 jobs:
-    # Use the latest published version of the cirrus-ci_retrospective action to
-    # determine the execution context of _this_ workflow run.
     cirrus-ci_retrospective:
         # Do not execute for other github applications, only works with cirrus-ci
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - name: Execute latest version of cirrus-ci_retrospective container image
+            - name: Execute latest upstream cirrus-ci_retrospective
               id: cirrus-ci_retrospective
               uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            - name: Archive latest version's output JSON
-              uses: actions/upload-artifact@v1.0.0
-              with:
-                  name: latest_retrospective.json.zip
-                  path: ./cirrus-ci_retrospective.json
-
-            - name: Check latest version's output for a Pull Request
+            - name: Check output for Cirrus-CI build versus Pull Request
               id: retro
               shell: bash
               run: |
@@ -42,25 +41,33 @@ jobs:
                   printf "\n::set-output name=sha::%s\n" "$sha"
 
             - if: always()
-              name: Analysis Debugging Values
+              name: Debug latest upstream cirrus-ci_retrospective output Values
               run: |
-                  echo "Success task object:"
-                  jq --indent=4 '.[] | select(.name == "cirrus-ci/test_success")' ./cirrus-ci_retrospective.json
                   echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
                   echo "PR Number: ${{ steps.retro.outputs.prn }}"
                   echo "SHA: ${{ steps.retro.outputs.sha }}"
+                  echo "Analyzed Cirrus-CI task:"
+                  jq --indent 4 '.[] | select(.name == "cirrus-ci/test_success")' ./cirrus-ci_retrospective.json
 
+            # N/B: At the time of this comment, it is not possible to provide
+            # direct links to specific job-steps (here) nor links to artifact
+            # files.  There are open RFE's for this capability to be added.
             - if: steps.retro.outputs.was_pr == 'true'
-              name: Latest cirrus-ci_retrospective version detected a PR
-              uses: actions/checkout@v2
+              id: create_pr_comment
+              name: Create a status comment in the PR
+              # Ref: https://github.com/marketplace/actions/comment-action
+              uses: jungwinter/comment@v1
               with:
-                  fetch-depth: 0
-                  path: ./pull_request
-                  # ignored for some inexplicable reason
-                  # ref: ${{ steps.retro.outputs.sha }}
+                  issue_number: '${{ steps.retro.outputs.prn }}'
+                  type: 'create'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      [Cirrus-CI Retrospective Github
+                      Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      has started.  Running against ${{ steps.retro.outputs.sha }} in this pull request.
 
             - if: steps.retro.outputs.was_pr == 'true'
-              name: Clone PR code used by Cirrus-CI
+              name: Clone PR code used by Cirrus-CI during completed build
               run: |
                   mkdir -p test_artifacts
                   cp "$GITHUB_EVENT_PATH" test_artifacts/
@@ -70,18 +77,46 @@ jobs:
                   git log -1 | tee ../test_artifacts/commit.txt
 
             - if: steps.retro.outputs.was_pr == 'true'
-              name: Test build PR-version of cirrus-ci_retrospective container image
+              id: edit_pr_comment_build
+              name: Update status comment on PR
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'edit'
+                  comment_id: '${{ steps.create_pr_comment.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      [Cirrus-CI Retrospective Github
+                      Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      is building [test container
+                      Dockerfile](https://github.com/${{ github.repository}}/blob/${{steps.retro.outputs.sha}}/cirrus-ci_retrospective/Dockerfile) from this PR.
+
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Build cirrus-ci_retrospective container image from PR code
               run: |
                   cd pull_request
                   docker build -t test_container \
                         -f cirrus-ci_retrospective/Dockerfile \
                         --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
                         ./ &> ../test_artifacts/build_output.txt
-              #   TODO: Not sure if this is helpful to have or not
-              #   docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
+              #  TODO: Not sure if this is helpful to have or a burden to download-
+              #  docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
 
             - if: steps.retro.outputs.was_pr == 'true'
-              name: Execute PR-version of cirrus-ci_retrospective container image
+              id: edit_pr_comment_exec
+              name: Update status comment on PR again
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'edit'
+                  comment_id: '${{ steps.edit_pr_comment_build.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      [Cirrus-CI Retrospective Github
+                      Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      is executing test container.  Built from ${{ steps.retro.outputs.sha }} in this pull
+                      request.
+
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Execute PR's cirrus-ci_retrospective container image
               run: |
                   cd pull_request
                   github_event_dirpath=$(dirname "${{ github.event_path }}")
@@ -104,7 +139,43 @@ jobs:
                   name: pr_${{ steps.retro.outputs.prn }}_test_artifacts_${{ steps.retro.outputs.sha }}.zip
                   path: ./test_artifacts
 
-            # TODO: Post link for test_artifacts.zip into a comment of PR
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Final status comment on PR
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'edit'
+                  comment_id: '${{ steps.edit_pr_comment_exec.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      Cirrus-CI Retrospective Github Action has finished running
+                      from pull request at ${{ steps.retro.outputs.sha }}.  [Results
+                      and artifacts are now available.]
+                      (https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+
+            - if: canceled() && steps.retro.outputs.was_pr == 'true'
+              # This can happen on --force push to PR or manual button press
+              name: Add comment on workflow cancle
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'edit'
+                  comment_id: '${{ steps.create_pr_comment.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      [Cirrus-CI Retrospective Github
+                      Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      was canceled against ${{ steps.retro.outputs.sha }} in this pull request.
+
+            - if: canceled() && steps.retro.outputs.was_pr == 'true'
+              name: Add comment on workflow failure
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'edit'
+                  comment_id: '${{ steps.create_pr_comment.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      [Cirrus-CI Retrospective Github
+                      Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      failed against ${{ steps.retro.outputs.sha }} in this pull request.
 
     debug:
         # Avoid useless executions
