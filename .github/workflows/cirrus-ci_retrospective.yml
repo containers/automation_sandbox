@@ -14,17 +14,20 @@ jobs:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - id: cirrus-ci_retrospective
+            - name: Execute latest version of cirrus-ci_retrospective container image
+              id: cirrus-ci_retrospective
               uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            - uses: actions/upload-artifact@v1.0.0
+            - name: Archive latest version's output JSON
+              uses: actions/upload-artifact@v1.0.0
               with:
-                  name: cirrus-ci_retrospective.json.zip
+                  name: latest_retrospective.json.zip
                   path: ./cirrus-ci_retrospective.json
 
-            - id: retro
+            - name: Check latest version's output for a Pull Request
+              id: retro
               shell: bash
               run: |
                   prn=$(jq '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
@@ -39,12 +42,16 @@ jobs:
                   printf "\n::set-output name=sha::%s\n" "$sha"
 
             - if: always()
+              name: Analysis Debugging Values
               run: |
-                  echo "${{ steps.retro.outputs.was_pr }}"
-                  echo "${{ steps.retro.outputs.prn }}"
-                  echo "${{ steps.retro.outputs.sha }}"
+                  echo "Success task object:"
+                  jq --indent=4 '.[] | select(.name == "cirrus-ci/test_success")' ./cirrus-ci_retrospective.json
+                  echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
+                  echo "PR Number: ${{ steps.retro.outputs.prn }}"
+                  echo "SHA: ${{ steps.retro.outputs.sha }}"
 
             - if: steps.retro.outputs.was_pr == 'true'
+              name: Latest cirrus-ci_retrospective version detected a PR
               uses: actions/checkout@v2
               with:
                   fetch-depth: 0
@@ -53,14 +60,17 @@ jobs:
                   # ref: ${{ steps.retro.outputs.sha }}
 
             - if: steps.retro.outputs.was_pr == 'true'
+              name: Clone PR code used by Cirrus-CI
               run: |
                   mkdir -p test_artifacts
+                  cp "$GITHUB_EVENT_PATH" test_artifacts/
                   cd pull_request
                   git fetch origin "${{ steps.retro.outputs.sha }}"
                   git checkout -b 'pr${{ steps.retro.outputs.prn }}' FETCH_HEAD
                   git log -1 | tee ../test_artifacts/commit.txt
 
             - if: steps.retro.outputs.was_pr == 'true'
+              name: Test build PR-version of cirrus-ci_retrospective container image
               run: |
                   cd pull_request
                   docker build -t test_container \
@@ -71,6 +81,7 @@ jobs:
               #   docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
 
             - if: steps.retro.outputs.was_pr == 'true'
+              name: Execute PR-version of cirrus-ci_retrospective container image
               run: |
                   cd pull_request
                   github_event_dirpath=$(dirname "${{ github.event_path }}")
@@ -87,9 +98,10 @@ jobs:
                   mv ./cirrus-ci_retrospective.json ../test_artifacts/ || true
 
             - if: always() && steps.retro.outputs.was_pr == 'true'
+              name: Archive event, build, and debugging output
               uses: actions/upload-artifact@v1.0.0
               with:
-                  name: test_artifacts.zip
+                  name: pr_${{ steps.retro.outputs.prn }}_test_artifacts_${{ steps.retro.outputs.sha }}.zip
                   path: ./test_artifacts
 
             # TODO: Post link for test_artifacts.zip into a comment of PR
@@ -100,6 +112,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/upload-artifact@v1.0.0
+              name: Archive triggering event JSON
               with:
                   # There is no way to avoid this being zipped :(
                   name: event.json.zip
