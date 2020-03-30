@@ -165,7 +165,7 @@ jobs:
                       Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
                       was canceled against ${{ steps.retro.outputs.sha }} in this pull request.
 
-            - if: canceled() && steps.retro.outputs.was_pr == 'true'
+            - if: cancelled() && steps.retro.outputs.was_pr == 'true'
               name: Add comment on workflow failure
               uses: jungwinter/comment@v1
               with:
