@@ -66,10 +66,15 @@ jobs:
                       Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
                       has started.  Running against ${{ steps.retro.outputs.sha }} in this pull request.
 
+            # Since we're executing from the master branch, github-actions will not
+            # allow us to directly checkout the PR code at this point.  We will do
+            # that in the subsequent step.
             - if: steps.retro.outputs.was_pr == 'true'
               name: Clone all repository code
               uses: actions/checkout@v2
               with:
+                  # Get ALL available history to avoid problems during any run of
+                  # 'git describe' from any script in the repo.
                   fetch-depth: 0
                   path: ./pull_request
                   # ignored for some inexplicable reason
