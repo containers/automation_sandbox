@@ -229,6 +229,9 @@ jobs:
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
 
     debug_cirrus-ci_retrospective:
+        if: github.event.check_suite.app.name == 'Cirrus CI'
+        runs-on: ubuntu-latest
+        steps:
             # Do this in parallel for simplicity since it's just for debugging
             # purposes.  Assume it will execute the same/similar to the regular job
             # above.
