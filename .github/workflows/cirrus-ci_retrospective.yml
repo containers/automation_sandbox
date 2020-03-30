@@ -71,6 +71,7 @@ jobs:
               run: |
                   mkdir -p test_artifacts
                   cp "$GITHUB_EVENT_PATH" test_artifacts/
+                  mkdir -p pull_request
                   cd pull_request
                   git fetch origin "${{ steps.retro.outputs.sha }}"
                   git checkout -b 'pr${{ steps.retro.outputs.prn }}' FETCH_HEAD
