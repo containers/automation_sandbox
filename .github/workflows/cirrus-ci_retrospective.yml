@@ -67,7 +67,16 @@ jobs:
                       has started.  Running against ${{ steps.retro.outputs.sha }} in this pull request.
 
             - if: steps.retro.outputs.was_pr == 'true'
-              name: Clone PR code used by Cirrus-CI during completed build
+              name: Clone all repository code
+              uses: actions/checkout@v2
+              with:
+                  fetch-depth: 0
+                  path: ./pull_request
+                  # ignored for some inexplicable reason
+                  # ref: ${{ steps.retro.outputs.sha }}
+
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Fetch PR code used by Cirrus-CI during completed build
               run: |
                   mkdir -p test_artifacts
                   cp "$GITHUB_EVENT_PATH" test_artifacts/
