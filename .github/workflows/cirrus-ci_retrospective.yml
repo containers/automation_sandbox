@@ -254,7 +254,7 @@ jobs:
               run: jq --indent 4 --color-output . ./cirrus-ci_retrospective.json
 
             - if: always()
-            - uses: actions/upload-artifact@v1.0.0
+              uses: actions/upload-artifact@v1.0.0
               name: Archive triggering event JSON and latest cirrus-ci_retrospective output
               with:
                   # There is no way to avoid this being zipped :(
