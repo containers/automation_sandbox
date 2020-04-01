@@ -11,14 +11,10 @@ set +x
 # bash
 # core-utils
 # curl
-# find-utils
 # git
 # install
-# jq
-# sed
 
-# FIXME: Should be automation, not automation_sandbox
-AUTOMATION_REPO_URL=${AUTOMATION_REPO_URL:-https://github.com/containers/automation_sandbox.git}
+AUTOMATION_REPO_URL=${AUTOMATION_REPO_URL:-https://github.com/containers/automation.git}
 AUTOMATION_REPO_BRANCH=${AUTOMATION_REPO_BRANCH:-master}
 # This must be hard-coded for executing via pipe to bash
 SCRIPT_FILENAME=install_automation.sh
@@ -27,8 +23,8 @@ AUTOMATION_VERSION="$1"
 shift || true  # ignore if no more args
 # Set non-zero to enable
 DEBUG=${DEBUG:-0}
-# Save a bit of typin
-OOE="./common/bin/ooe.sh"
+# Save some output eyestrain (if script can be found)
+OOE=$(realpath $(dirname "${BASH_SOURCE[0]}")/../common/bin/ooe.sh 2>/dev/null || echo "")
 # Sentinel value representing whatever version is present in the local repository
 MAGIC_LOCAL_VERSION='0.0.0'
 # Needed for unit-testing
