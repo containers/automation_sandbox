@@ -37,17 +37,17 @@ cirrus-ci/test_manual_task:
             path: '*.log'
 
 # CI-Testing (itself) task that always fails in PRs + uploads simple artifact
-cirrus-ci/test_failing_task:
-    script:
-        - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail" > failing_output.log
-        - test -z "$CIRRUS_PR"  # only fail when running on pull requests
-    always:
-        <<: *results
+# cirrus-ci/test_failing_task:
+#     script:
+#         - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/fail" > failing_output.log
+#         - test -z "$CIRRUS_PR"  # only fail when running on pull requests
+#     always:
+#         <<: *results
 
 
 cirrus-ci/test_success_task:
     depends_on:
         - cirrus-ci/actual_test
         - cirrus-ci/test_passing
-        - cirrus-ci/test_failing
+        # - cirrus-ci/test_failing
         - cirrus-ci/test_manual
