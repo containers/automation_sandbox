@@ -5,7 +5,7 @@ RUN microdnf update -y && \
     rm -rf /var/cache/dnf
 
 ARG INSTALL_AUTOMATION_VERSION=latest
-ARG INSTALL_AUTOMATION_URI=https://raw.githubusercontent.com/containers/automation_sandbox/master/bin/install_automation.sh
+ARG INSTALL_AUTOMATION_URI=https://raw.githubusercontent.com/containers/automation/master/bin/install_automation.sh
 ADD / /usr/src/automation
 RUN if [[ "$INSTALL_AUTOMATION_VERSION" == "0.0.0" ]]; then \
         env INSTALL_PREFIX=/usr/share \
