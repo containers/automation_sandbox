@@ -2,17 +2,14 @@
 
 # Default runtime environment
 container:
-    image: 'registry.fedoraproject.org/fedora-minimal:latest'
+    image: quay.io/libpod/cirrus-ci_retrospective:latest
 
 
 # Actual testing task for code in this repo.
 cirrus-ci/actual_test_task:
     env:
         CIRRUS_CLONE_DEPTH: 0
-    setup_script:
-        - microdnf update -y
-        - microdnf install findutils git jq
-    test_script:
+    script:
         - git fetch --tags
         - $CIRRUS_WORKING_DIR/bin/run_all_tests.sh
 
@@ -26,6 +23,18 @@ cirrus-ci/test_passing_task:
         test_artifacts:
             path: '*.log'
 
+# CI-Testing that must be manually triggered
+cirrus-ci/test_manual_task:
+    depends_on:
+        - cirrus-ci/actual_test
+        - cirrus-ci/test_passing
+    trigger_type: manual
+    script:
+        - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/manual" > manual_output.log
+        - true
+    always: &results
+        test_artifacts:
+            path: '*.log'
 
 # CI-Testing (itself) task that always fails in PRs + uploads simple artifact
 cirrus-ci/test_failing_task:
@@ -41,3 +50,4 @@ cirrus-ci/test_success_task:
         - cirrus-ci/actual_test
         - cirrus-ci/test_passing
         - cirrus-ci/test_failing
+        - cirrus-ci/test_manual
