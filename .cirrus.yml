@@ -50,4 +50,3 @@ cirrus-ci/test_success_task:
         - cirrus-ci/actual_test
         - cirrus-ci/test_passing
         # - cirrus-ci/test_failing
-        - cirrus-ci/test_manual
