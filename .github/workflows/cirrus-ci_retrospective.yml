@@ -42,9 +42,9 @@ jobs:
               id: retro
               shell: bash
               run: |
-                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
-                  tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_success") | .id' ./cirrus-ci_retrospective.json)
-                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
+                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.pullRequest' ./cirrus-ci_retrospective.json)
+                  tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./cirrus-ci_retrospective.json)
+                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
                   if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
                       printf "\n::set-output name=was_pr::true\n"
                       printf "\n::set-output name=prn::%d\n" "$prn"
@@ -61,7 +61,7 @@ jobs:
               run: |
                   echo ""
                   echo "Analyzed Cirrus-CI task:"
-                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_success")' ./cirrus-ci_retrospective.json
+                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_manual")' ./cirrus-ci_retrospective.json
                   echo ""
                   echo "Analysis Result:"
                   echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
@@ -181,6 +181,39 @@ jobs:
                       &> ../test_artifacts/debug_output.txt
                   mv ./cirrus-ci_retrospective.json ../test_artifacts/ || true
 
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Verify output JSON from test container functions as expected
+              id: actual
+              shell: bash
+              # TODO: De-duplicate this and `id: retro` (above)
+              run: |
+                  err() { a=$1; e=$2; echo "::error::Test container \$$a='${!a}', expecting '$e'"; exit 1; }
+                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.pullRequest' ./test_artifacts/cirrus-ci_retrospective.json)
+                  tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./test_artifacts/cirrus-ci_retrospective.json)
+                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./test_artifacts/cirrus-ci_retrospective.json)
+
+                  if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.was_pr }}" ]]; then
+                      err prn "${{ steps.retro.outputs.prn }}"
+                  elif [[ -z "$tid" ]] || [[ "$tid" != "${{ steps.retro.outputs.tid }}" ]]; then
+                      err prn "${{ steps.retro.outputs.tid }}"
+                  elif [[ -z "$sha" ]] || [[ "$sha" != "${{ steps.retro.outputs.sha }}" ]]; then
+                      err prn "${{ steps.retro.outputs.sha }}"
+                  fi
+
+            # Allow PR to be merged by triggering this 'manual' task in Cirrus CI
+            - if: steps.retro.outputs.was_pr == 'true'
+              name: Trigger Required Cirrus-CI manual task on PR
+              env:
+                  # ID we provide to cirrus, to verify the correct operation was performed.
+                  UUID: ${{github.run_id}}.${{steps.retro.outputs.prn}}.${{steps.retro.outputs.sha}}
+              run: |
+                  curl --request POST \
+                    --url https://api.cirrus-ci.com/graphql \
+                    --header '${{ secrets.CIRRUS_CI_AUTH_HEADER }}' \
+                    --header 'content-type: application/json' \
+                    --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' | \
+                    tee ./test_artifacts/manual.json
+
             # The debug.sh script provides verbose output not suitable for logging.
             # Provide an archive of files for debugging/analysis.
             - if: always() && steps.retro.outputs.was_pr == 'true'
@@ -189,6 +222,21 @@ jobs:
               with:
                   name: pr_${{ steps.retro.outputs.prn }}_test_artifacts_${{ steps.retro.outputs.sha }}.zip
                   path: ./test_artifacts
+
+            # In case there was a problem, provide details about what might have gone wrong.
+            - if: always()
+              name: Debug latest upstream cirrus-ci_retrospective output Values
+              run: |
+                  echo ""
+                  echo "Analyzed Cirrus-CI task:"
+                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_manual")' ./cirrus-ci_retrospective.json
+                  echo ""
+                  echo "Analysis Result:"
+                  echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
+                  echo "PR Number: ${{ steps.retro.outputs.prn }}"
+                  echo "Task ID was: ${{ steps.retro.outputs.tid }}"
+                  echo "SHA: ${{ steps.retro.outputs.sha }}"
+
 
             # Workflow against a PR was successful, provide that feedback in the PR
             - if: steps.retro.outputs.was_pr == 'true'
@@ -230,6 +278,7 @@ jobs:
                       Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
                       failed against this PR's
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
+
 
     debug_cirrus-ci_retrospective:
         if: github.event.check_suite.app.name == 'Cirrus CI'
