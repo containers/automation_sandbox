@@ -1,5 +1,12 @@
 ---
 
+# Ref: https://cirrus-ci.org/guide/writing-tasks/
+
+# Global environment variables
+env:
+    # Name of the typical destination branch for PRs.
+    DEST_BRANCH: "master"
+
 # Default runtime environment
 container:
     image: quay.io/libpod/cirrus-ci_retrospective:latest
@@ -29,6 +36,8 @@ cirrus-ci/test_manual_task:
         - cirrus-ci/actual_test
         - cirrus-ci/test_passing
     trigger_type: manual
+    # Only required for PRs
+    only_if: $CIRRUS_BRANCH != $DEST_BRANCH
     script:
         - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/manual" > manual_output.log
         - true
