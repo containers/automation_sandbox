@@ -192,7 +192,7 @@ jobs:
                   tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./test_artifacts/cirrus-ci_retrospective.json)
                   sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./test_artifacts/cirrus-ci_retrospective.json)
 
-                  if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.was_pr }}" ]]; then
+                  if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
                       err prn "${{ steps.retro.outputs.prn }}"
                   elif [[ -z "$tid" ]] || [[ "$tid" != "${{ steps.retro.outputs.tid }}" ]]; then
                       err prn "${{ steps.retro.outputs.tid }}"
