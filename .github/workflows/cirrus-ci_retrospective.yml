@@ -42,8 +42,8 @@ jobs:
               id: retro
               shell: bash
               run: |
-                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
-                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
+                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_success") | .build.pullRequest' ./cirrus-ci_retrospective.json)
+                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_success") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
                   if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
                       printf "\n::set-output name=was_pr::true\n"
                       printf "\n::set-output name=prn::%d\n" "$prn"
@@ -59,7 +59,7 @@ jobs:
               run: |
                   echo ""
                   echo "Analyzed Cirrus-CI task:"
-                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/success")' ./cirrus-ci_retrospective.json
+                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_success")' ./cirrus-ci_retrospective.json
                   echo ""
                   echo "Analysis Result:"
                   echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
