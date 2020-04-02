@@ -218,7 +218,11 @@ jobs:
                     --header '${{ secrets.CIRRUS_CI_AUTH_HEADER }}' \
                     --header 'content-type: application/json' \
                     --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' | \
-                    tee ./test_artifacts/manual.json
+                    > ./test_artifacts/manual.json
+
+                  actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/manual.json)
+                  echo "Verifying returned tracking value"
+                  test "$actual" == "$UUID"
 
             # Workflow against a PR was successful, provide that feedback in the PR
             - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'paused'
