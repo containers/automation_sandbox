@@ -167,7 +167,7 @@ jobs:
 
             # Finally, execute the PR's version of the container, against the same event.json
             # used to trigger this workflow run - since it's guaranteed to represent a PR.
-            - if: steps.retro.outputs.was_pr == 'true'
+            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
               name: Execute PR's cirrus-ci_retrospective container image && steps.retro.outputs.tst == 'paused'
               run: |
                   cd pull_request
@@ -217,7 +217,7 @@ jobs:
                     --url https://api.cirrus-ci.com/graphql \
                     --header '${{ secrets.CIRRUS_CI_AUTH_HEADER }}' \
                     --header 'content-type: application/json' \
-                    --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' | \
+                    --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' \
                     > ./test_artifacts/manual.json
 
                   actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/manual.json)
