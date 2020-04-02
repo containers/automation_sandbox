@@ -92,6 +92,26 @@ jobs:
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
                       in this pull request.
 
+            # This task should only have been triggered from _this_ action,
+            # never manually or by duplicate run with same sha and pr.
+            - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'COMPLETED'
+              name: Final status comment on PR
+              uses: jungwinter/comment@v1
+              with:
+                  type: 'create'
+                  issue_number: '${{ steps.retro.outputs.prn }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      ***Warning***: [cirrus-ci_retrospective
+                      action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      found `cirrus-ci/test_manual` task in this PR, with unexpected `COMPLETED` status.
+                      This task should never be triggered manually, or multiple times, under normal
+                      circumstances.  Manual security review of
+                      [this commit, and
+                      prior](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
+                      is highly recommended before merging.
+
+
             # Since we're executing from the master branch, github-actions will not
             # allow us to directly checkout the PR code at this point.  We will do
             # that in the subsequent step.
@@ -194,7 +214,7 @@ jobs:
                   prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.pullRequest' ./test_artifacts/cirrus-ci_retrospective.json)
                   tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./test_artifacts/cirrus-ci_retrospective.json)
                   sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./test_artifacts/cirrus-ci_retrospective.json)
-                  status=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .status' ./test_artifacts/cirrus-ci_retrospective.json)
+                  tst=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .status' ./test_artifacts/cirrus-ci_retrospective.json)
 
                   if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
                       err prn "${{ steps.retro.outputs.prn }}"
@@ -202,8 +222,8 @@ jobs:
                       err prn "${{ steps.retro.outputs.tid }}"
                   elif [[ -z "$sha" ]] || [[ "$sha" != "${{ steps.retro.outputs.sha }}" ]]; then
                       err prn "${{ steps.retro.outputs.sha }}"
-                  elif [[ -z "$status" ]] || "$status" != "${{ steps.retro.outputs.tst }}"; then
-                      err status "${{ steps.retro.outputs.tst }}"
+                  elif [[ -z "$tst" ]] || "$tst" != "${{ steps.retro.outputs.tst }}"; then
+                      err tst "${{ steps.retro.outputs.tst }}"
                   fi
 
             # Allow PR to be merged by triggering required action-status marker task in Cirrus CI
@@ -241,7 +261,7 @@ jobs:
 
             # The debug.sh script provides verbose output not suitable for logging.
             # Provide an archive of files for debugging/analysis.
-            - if: always() && steps.retro.outputs.was_pr == 'true'
+            - if: always() && steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
               name: Archive event, build, and debugging output
               uses: actions/upload-artifact@v1.0.0
               with:
