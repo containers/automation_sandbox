@@ -92,6 +92,8 @@ jobs:
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
                       in this pull request.
 
+            # TODO: Should be re-checked w/ second run of latest container
+            #       after building & testing container image
             # This task should only have been triggered from _this_ action,
             # never manually or by duplicate run with same sha and pr.
             - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'COMPLETED'
@@ -269,7 +271,7 @@ jobs:
                   path: ./test_artifacts
 
             # In case there was a problem, provide details about what might have gone wrong.
-            - if: always()
+            - if: always() && steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'paused'
               name: Debug latest upstream cirrus-ci_retrospective output Values
               run: |
                   echo "Analysis Result:"
