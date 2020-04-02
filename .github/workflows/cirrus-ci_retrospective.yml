@@ -202,8 +202,8 @@ jobs:
                       err prn "${{ steps.retro.outputs.tid }}"
                   elif [[ -z "$sha" ]] || [[ "$sha" != "${{ steps.retro.outputs.sha }}" ]]; then
                       err prn "${{ steps.retro.outputs.sha }}"
-                  elif [[ -z "$status" ]] || "$status" != "${ steps.retro.outputs.status }"; then
-                      err status "${ steps.retro.outputs.status }"
+                  elif [[ -z "$status" ]] || "$status" != "${{ steps.retro.outputs.tst }}"; then
+                      err status "${{ steps.retro.outputs.tst }}"
                   fi
 
             # Allow PR to be merged by triggering required action-status marker task in Cirrus CI
