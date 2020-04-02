@@ -96,7 +96,7 @@ jobs:
             #       after building & testing container image
             # This task should only have been triggered from _this_ action,
             # never manually or by duplicate run with same sha and pr.
-            - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'COMPLETED'
+            - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst != 'paused'
               name: Final status comment on PR
               uses: jungwinter/comment@v1
               with:
@@ -106,8 +106,8 @@ jobs:
                   body: >-
                       ***Warning***: [cirrus-ci_retrospective
                       action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
-                      found `cirrus-ci/test_manual` task in this PR, with unexpected `COMPLETED` status.
-                      This task should never be triggered manually, or multiple times, under normal
+                      found `cirrus-ci/test_manual` task in this PR, with unexpected `${{ steps.retro.outputs.tst }}`
+                      status. This task should never be triggered manually, or multiple times, under normal
                       circumstances.  Manual security review of
                       [this commit, and
                       prior](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
