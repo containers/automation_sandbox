@@ -24,7 +24,7 @@ env:
 
 jobs:
     # Obtain task details and validate required execution conditions
-    cirrus-ci_retrospective_smoke:
+    cirrus-ci_retrospective:
         # Do not execute for other github applications, only works with cirrus-ci
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
@@ -84,40 +84,6 @@ jobs:
               run: >-
                   printf "::error::Found ${ACTION_TASK} with unexpected ${{ steps.retro.outputs.tst }} status"
                   exit 1
-
-    # Execute in parallel with smoke (above) to improve overall performance
-    cirrus-ci_retrospective:
-        if: github.event.check_suite.app.name == 'Cirrus CI'
-        needs:
-            - cirrus-ci_retrospective_smoke
-        runs-on: ubuntu-latest
-        steps:
-            - name: Execute latest upstream cirrus-ci_retrospective
-              uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
-              env:
-                GITHUB_TOKEN: ${{ github.token }}
-
-            - name: Clone master branch repository code
-              uses: actions/checkout@v2
-              with:
-                  fetch-depth: 1
-                  path: ./master
-                  # DO NOT build-in any unnecessary permissions
-                  persist-credentials: 'false'
-
-            - name: Validate helper scripts before use
-              run: |
-                  source ./master/$HELPER_SUBDIR/test_helpers.sh
-
-            - name: Check output for a Cirrus-CI build versus Pull Request
-              id: retro
-              run: |
-                  ccirjson="$GITHUB_WORKSPACE/cirrus-ci_retrospective.json"
-                  source ./master/$HELPER_SUBDIR/set_action_vars.sh
-                  if [[ "$do_intg" != "true" ]]; then
-                      printf "::error::Expecting \$do_intg to be 'true', not '$do_intg'"
-                      exit 1
-                  fi
 
             # Provide feedback in PR for normal workflow ($ACTION-TASK task has not run).
             - if: steps.retro.outputs.do_intg == 'true'
