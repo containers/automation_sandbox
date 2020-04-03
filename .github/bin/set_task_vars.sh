@@ -4,10 +4,10 @@
 # It should not be used under any other context.
 
 # Consume the output JSON from running the cirrus-ci_retrospective container.
-prn=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.pullRequest' ./cirrus-ci_retrospective.json)
-tid=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .id' ./cirrus-ci_retrospective.json)
-sha=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
-tst=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .status' ./cirrus-ci_retrospective.json)
+prn=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.pullRequest' "$ccirjson")
+tid=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .id' "$ccirjson")
+sha=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.changeIdInRepo' "$ccirjson")
+tst=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .status' "$ccirjson")
 
 was_pr='false'
 do_intg='false'

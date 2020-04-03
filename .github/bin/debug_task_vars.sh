@@ -14,6 +14,6 @@ echo "Action Task Status: ${tst}"
 echo "Do integration testing: ${do_intg}"
 echo ""
 echo "Analyzed Cirrus-CI monitoring task:"
-jq --indent 4 --color-output '.[] | select(.name == "${MONITOR_TASK}")' ./cirrus-ci_retrospective.json
+jq --indent 4 --color-output '.[] | select(.name == "${MONITOR_TASK}")' "$ccirjson"
 echo "Analyzed Cirrus-CI action task:"
-jq --indent 4 --color-output '.[] | select(.name == "${ACTION_TASK}")' ./cirrus-ci_retrospective.json
+jq --indent 4 --color-output '.[] | select(.name == "${ACTION_TASK}")' "$ccirjson"

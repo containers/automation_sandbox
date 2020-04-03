@@ -52,12 +52,14 @@ jobs:
             - name: Check output for a Cirrus-CI build versus Pull Request
               id: retro
               run: |
+                  ccirjson="$GITHUB_WORKSPACE/cirrus-ci_retrospective.json"
                   source ./master/$HELPER_SUBDIR/set_action_vars.sh
 
             # In case there was a problem, provide details about what might have gone wrong.
             - if: always()
               name: Debug latest upstream cirrus-ci_retrospective output Values
               run: |
+                  ccirjson="$GITHUB_WORKSPACE/cirrus-ci_retrospective.json"
                   source ./master/$HELPER_SUBDIR/debug_task_vars.sh
 
             # Negative case, abnormal workflow ($ACTION-TASK task already ran / not paused).
@@ -110,6 +112,7 @@ jobs:
             - name: Check output for a Cirrus-CI build versus Pull Request
               id: retro
               run: |
+                  ccirjson="$GITHUB_WORKSPACE/cirrus-ci_retrospective.json"
                   source ./master/$HELPER_SUBDIR/set_action_vars.sh
                   if [[ "$do_intg" != "true" ]]; then
                       printf "::error::Expecting \$do_intg to be 'true', not '$do_intg'"
@@ -234,18 +237,40 @@ jobs:
             - if: steps.retro.outputs.do_intg == 'true'
               name: Verify output JSON from test container parses for future use by this workflow
               run: |
+                  ccirjson="$GITHUB_WORKSPACE/test_artifacts/cirrus-ci_retrospective.json"
                   source ./pull_request/$HELPER_SUBDIR/debug_task_vars.sh
-                  cd test_artifacts
                   err() { a=$1; e=$2; echo "::error::Test container \$$a='${!a}', expecting '$e'"; exit 1; }
                   if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
                       err prn "${{ steps.retro.outputs.prn }}"
+                  elif [[ -z "$was_pr" ]] || [[ "$was_pr" != "${{ steps.retro.outputs.was_pr }}" ]]; then
+                      err was_pr "${{ steps.retro.outputs.was_pr }}"
                   elif [[ -z "$tid" ]] || [[ "$tid" != "${{ steps.retro.outputs.tid }}" ]]; then
-                      err prn "${{ steps.retro.outputs.tid }}"
+                      err tid "${{ steps.retro.outputs.tid }}"
                   elif [[ -z "$sha" ]] || [[ "$sha" != "${{ steps.retro.outputs.sha }}" ]]; then
-                      err prn "${{ steps.retro.outputs.sha }}"
+                      err sha "${{ steps.retro.outputs.sha }}"
                   elif [[ -z "$tst" ]] || "$tst" != "${{ steps.retro.outputs.tst }}"; then
                       err tst "${{ steps.retro.outputs.tst }}"
+                  elif [[ -z "$do_intg" ]] || "$do_intg" != "${{ steps.retro.outputs.do_intg }}"; then
+                      err do_intg "${{ steps.retro.outputs.do_intg }}"
                   fi
+
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Load output values from PR version of helper
+              id: pr_retro
+              run: |
+                  ccirjson="$GITHUB_WORKSPACE/test_artifacts/cirrus-ci_retrospective.json"
+                  source ./pull_request/$HELPER_SUBDIR/set_action_vars.sh
+
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Validate PR output values match expected values
+              run: |
+                  samesame() { if [[ -z "$1" ]] || [[ "$1" != "$2" ]]; then echo "::error::Expecting $1 '$2' to equal '$3'"; exit 1; fi }
+                  samesame "steps.pr_retro.prn" "${{ steps.pr_retro.prn }}" "${{ steps.retro.outputs.prn }}"
+                  samesame "steps.pr_retro.was_pr" "${{ steps.pr_retro.was_pr }}" "${{ steps.retro.outputs.was_pr }}"
+                  samesame "steps.pr_retro.tid" "${{ steps.pr_retro.tid }}" "${{ steps.retro.outputs.tid }}"
+                  samesame "steps.pr_retro.sha" "${{ steps.pr_retro.sha }}" "${{ steps.retro.outputs.sha }}"
+                  samesame "steps.pr_retro.tst" "${{ steps.pr_retro.tst }}" "${{ steps.retro.outputs.tst }}"
+                  samesame "steps.pr_retro.do_intg" "${{ steps.pr_retro.do_intg }}" "${{ steps.retro.outputs.do_intg }}"
 
             # Allow PR to be merged by triggering required action-status marker task in Cirrus CI
             - if: steps.retro.outputs.do_intg == 'true'
