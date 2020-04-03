@@ -56,3 +56,4 @@ dbg() {
         ) > /dev/stderr
     fi
 }
+dbg "Automation common library debugging enabled"
