@@ -13,22 +13,53 @@ on:
         types:
             - completed
 
+# Variables required by multiple jobs/steps
+env:
+    # Authoritative Cirrus-CI task to monitor for completion info of all other cirrus-ci tasks.
+    MONITOR_TASK: 'cirrus-ci/success'
+    # Authoritative Github Action task (in cirrus-ci) to trigger / check for completion of _this_ workflow
+    ACTION_TASK: 'github-actions/success'
+    # These same variables and filters need to be used multiple times under varying conditions
+    set_task_vars: |
+        prn=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.pullRequest' ./cirrus-ci_retrospective.json)
+        tid=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .id' ./cirrus-ci_retrospective.json)
+        sha=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
+        tst=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .status' ./cirrus-ci_retrospective.json)
+        was_pr='false'
+        do_intg='false'
+        if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]]; then
+            was_pr='true'
+            if [[ -n "$tst" ]] && [[ "$tst" == "paused" ]]; then
+                do_intg='true'
+            fi
+        fi
+    # Help debug filter/data problems
+    debug_task_vars: |
+        echo "Shell variables set:"
+        ${{ env.set_task_vars }}
+        echo "Cirrus-CI ran on pr: $was_pr"
+        echo "Monitor PR Number: ${prn}"
+        echo "Monitor SHA: ${sha}"
+        echo "Action Task ID was: ${tid}"
+        echo "Action Task Status: ${tst}"
+        echo "Do integration testing: ${do_intg}"
+        echo ""
+        echo "Analyzed Cirrus-CI monitoring task:"
+        jq --indent 4 --color-output '.[] | select(.name == "${MONITOR_TASK}")' ./cirrus-ci_retrospective.json
+        echo "Analyzed Cirrus-CI action task:"
+        jq --indent 4 --color-output '.[] | select(.name == "${ACTION_TASK}")' ./cirrus-ci_retrospective.json
+
 jobs:
-    cirrus-ci_retrospective:
+    # Obtain task details and validate required execution conditions
+    cirrus-ci_retrospective_smoke:
         # Do not execute for other github applications, only works with cirrus-ci
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            # This container image is built and pushed (after testing), when a
-            # new tag like 'vXX.YY.ZZ' is pushed.  These tagged versions are
-            # intended to provide behavioral consistency when used outside
-            # of this repository.
             - name: Execute latest upstream cirrus-ci_retrospective
-              id: cirrus-ci_retrospective
               # Actually use the (not-normally recommended) latest version,
-              # since it likely represents the most recent and behaviors.
-              # This avoids needing to rebuild the container image for every
-              # run, saving time at the possible expense of stability.
+              # since it likely represents the behaviors most similar to
+              # what this action expects.
               uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
               env:
                 GITHUB_TOKEN: ${{ github.token }}
@@ -42,17 +73,9 @@ jobs:
               id: retro
               shell: bash
               run: |
-                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.pullRequest' ./cirrus-ci_retrospective.json)
-                  tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./cirrus-ci_retrospective.json)
-                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
-                  tst=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .status' ./cirrus-ci_retrospective.json)
-                  if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ -n "$tst" ]] && [[ $prn -gt 0 ]] && [[ -n "$sha" ]]; then
-                      printf "\n::set-output name=was_pr::true\n"
-                      printf "\n::set-output name=prn::%d\n" "$prn"
-                  else
-                      printf "\n::set-output name=was_pr::false\n"
-                      printf "\n::set-output name=prn::null\n"
-                  fi
+                  ${set_task_vars}
+                  printf "\n::set-output name=was_pr::%s\n" "$was_pr"
+                  printf "\n::set-output name=prn::%d\n" "$prn"
                   printf "\n::set-output name=tid::%s\n" "$tid"
                   printf "\n::set-output name=sha::%s\n" "$sha"
                   printf "\n::set-output name=tst::%s\n" "$tst"
@@ -61,19 +84,58 @@ jobs:
             - if: always()
               name: Debug latest upstream cirrus-ci_retrospective output Values
               run: |
-                  echo ""
-                  echo "Analyzed Cirrus-CI task:"
-                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_manual")' ./cirrus-ci_retrospective.json
-                  echo ""
-                  echo "Analysis Result:"
-                  echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
-                  echo "PR Number: ${{ steps.retro.outputs.prn }}"
-                  echo "Task ID was: ${{ steps.retro.outputs.tid }}"
-                  echo "SHA: ${{ steps.retro.outputs.sha }}"
-                  echo "Task Status: ${{ steps.retro.outputs.tst }}"
+                  ${debug_task_vars}
 
-            # Provide feedback to PR in the form of a comment, IF action-success task has not run.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            # Negative case, abnormal workflow ($ACTION-TASK task already ran / not paused).
+            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst != 'paused'
+              id: create_error_pr_comment
+              name: Create a status comment in the PR
+              # Ref: https://github.com/marketplace/actions/comment-action
+              uses: jungwinter/comment@v1
+              with:
+                  issue_number: '${{ steps.retro.outputs.prn }}'
+                  type: 'create'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      ***ERROR***: [cirrus-ci_retrospective
+                      action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      found `${{ env.ACTION_TASK }}` task with unexpected `${{ steps.retro.outputs.tst }}`
+                      status. This task should never be triggered manually (or multiple times) under normal
+                      circumstances.
+
+            # Negative case followup, fail the build with an error
+            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst != 'paused'
+              run: >-
+                  printf "::error::Found ${ACTION_TASK} with unexpected ${{ steps.retro.outputs.tst }} status"
+                  exit 1
+
+    # Execute in parallel with smoke (above) to improve overall performance
+    cirrus-ci_retrospective:
+        if: github.event.check_suite.app.name == 'Cirrus CI'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Execute latest upstream cirrus-ci_retrospective
+              uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
+              env:
+                GITHUB_TOKEN: ${{ github.token }}
+
+            - name: Check output for a Cirrus-CI build versus Pull Request
+              id: retro
+              shell: bash
+              run: |
+                  ${set_task_vars}
+                  printf "\n::set-output name=prn::%d\n" "$prn"
+                  printf "\n::set-output name=tid::%s\n" "$tid"
+                  printf "\n::set-output name=sha::%s\n" "$sha"
+                  printf "\n::set-output name=tst::%s\n" "$tst"
+                  printf "\n::set-output name=do_intg::%s\n" "$do_intg"
+
+            # Same failure condition as smoke job
+            - if: steps.retro.outputs.do_intg != 'true'
+              run: exit 1
+
+            # Provide feedback in PR for normal workflow ($ACTION-TASK task has not run).
+            - if: steps.retro.outputs.do_intg == 'true'
               id: create_pr_comment
               name: Create a status comment in the PR
               # Ref: https://github.com/marketplace/actions/comment-action
@@ -92,32 +154,9 @@ jobs:
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
                       in this pull request.
 
-            # TODO: Should be re-checked w/ second run of latest container
-            #       after building & testing container image
-            # This task should only have been triggered from _this_ action,
-            # never manually or by duplicate run with same sha and pr.
-            - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst != 'paused'
-              name: Final status comment on PR
-              uses: jungwinter/comment@v1
-              with:
-                  type: 'create'
-                  issue_number: '${{ steps.retro.outputs.prn }}'
-                  token: '${{ secrets.GITHUB_TOKEN }}'
-                  body: >-
-                      ***Warning***: [cirrus-ci_retrospective
-                      action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
-                      found `cirrus-ci/test_manual` task in this PR, with unexpected `${{ steps.retro.outputs.tst }}`
-                      status. This task should never be triggered manually, or multiple times, under normal
-                      circumstances.  Manual security review of
-                      [this commit, and
-                      prior](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
-                      is highly recommended before merging.
-
-
-            # Since we're executing from the master branch, github-actions will not
-            # allow us to directly checkout the PR code at this point.  We will do
-            # that in the subsequent step.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            # Since we're executing from the master branch, github will silently
+            # block allow direct checkout of PR code.
+            - if: steps.retro.outputs.do_intg == 'true'
               name: Clone all repository code
               uses: actions/checkout@v2
               with:
@@ -125,14 +164,15 @@ jobs:
                   # 'git describe' from any script in the repo.
                   fetch-depth: 0
                   path: ./pull_request
-                  # ignored for some inexplicable reason
-                  # ref: ${{ steps.retro.outputs.sha }}
+                  # Will be used to execute code from the PR
+                  # DO NOT build-in any unnecessary permissions
+                  persist-credentials: 'false'
 
             # This workflow always runs from the master branch, this is not helpful
             # for PR authors wanting to change the container or script's behavior.
             # Clone down a copy of the code from the PR, so it may be utilized for
             # a test-build and secondary execution of cirrus-ci_retrospective
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            - if: steps.retro.outputs.do_intg == 'true'
               name: Fetch PR code used by Cirrus-CI during completed build
               run: |
                   mkdir -p test_artifacts
@@ -145,7 +185,7 @@ jobs:
 
             # Update the comment posted to the PR, replace it's content with the current
             # execution status and links.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            - if: steps.retro.outputs.do_intg == 'true'
               id: edit_pr_comment_build
               name: Update status comment on PR
               uses: jungwinter/comment@v1
@@ -162,7 +202,7 @@ jobs:
             # The Dockerfile and container environment may have changed in addition
             # to scripts.  Re-build a testing container image for use in exercising
             # the code from the PR.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            - if: steps.retro.outputs.do_intg == 'true'
               name: Build cirrus-ci_retrospective container image from PR code
               run: |
                   cd pull_request
@@ -170,11 +210,9 @@ jobs:
                         -f cirrus-ci_retrospective/Dockerfile \
                         --build-arg INSTALL_AUTOMATION_VERSION=0.0.0 \
                         ./ &> ../test_artifacts/build_output.txt
-              #  TODO: Not sure if this is helpful to have or a burden to download-
-              #  docker save test_container | gzip > ../test_artifacts/test_container.tar.gz
 
             # The container build can take a few minutes, update status comment when it finishes.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
+            - if: steps.retro.outputs.do_intg == 'true'
               id: edit_pr_comment_exec
               name: Update status comment on PR again
               uses: jungwinter/comment@v1
@@ -187,10 +225,10 @@ jobs:
                       Action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
                       is executing test container.
 
-            # Finally, execute the PR's version of the container, against the same event.json
-            # used to trigger this workflow run - since it's guaranteed to represent a PR.
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
-              name: Execute PR's cirrus-ci_retrospective container image && steps.retro.outputs.tst == 'paused'
+            # Execute the PR's version of the container, against the same event.json
+            # used to trigger this workflow run.
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Execute PR's cirrus-ci_retrospective container image
               run: |
                   cd pull_request
                   github_event_dirpath=$(dirname "${{ github.event_path }}")
@@ -199,25 +237,21 @@ jobs:
                       -e GITHUB_EVENT_PATH=/github/workflow/event.json \
                       -e GITHUB_ACTIONS=true \
                       -e GITHUB_WORKSPACE=/github/workspace \
-                      -v "$PWD":"/github/workspace" \
+                      -v "$GITHUB_WORKSPACE/pull_request":"/github/workspace" \
                       -v $github_event_dirpath:/github/workflow \
                       --entrypoint=/bin/bash test_container \
                       -c "source /etc/profile && exec /usr/share/automation/bin/debug.sh" \
                       &> ../test_artifacts/debug_output.txt
                   mv ./cirrus-ci_retrospective.json ../test_artifacts/ || true
 
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
-              name: Verify output JSON from test container functions as expected
-              id: actual
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Verify output JSON from test container parses for future use by this workflow
               shell: bash
-              # TODO: De-duplicate this and `id: retro` (above)
               run: |
+                  cd test_artifacts
+                  ${set_task_vars}
+                  ${debug_task_vars}
                   err() { a=$1; e=$2; echo "::error::Test container \$$a='${!a}', expecting '$e'"; exit 1; }
-                  prn=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.pullRequest' ./test_artifacts/cirrus-ci_retrospective.json)
-                  tid=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .id' ./test_artifacts/cirrus-ci_retrospective.json)
-                  sha=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .build.changeIdInRepo' ./test_artifacts/cirrus-ci_retrospective.json)
-                  tst=$(jq --raw-output '.[] | select(.name == "cirrus-ci/test_manual") | .status' ./test_artifacts/cirrus-ci_retrospective.json)
-
                   if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
                       err prn "${{ steps.retro.outputs.prn }}"
                   elif [[ -z "$tid" ]] || [[ "$tid" != "${{ steps.retro.outputs.tid }}" ]]; then
@@ -229,75 +263,42 @@ jobs:
                   fi
 
             # Allow PR to be merged by triggering required action-status marker task in Cirrus CI
-            - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
-              name: Trigger Required Cirrus-CI manual task on PR
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Trigger Cirrus-CI ${{ env.ACTION_TASK }} task on PR
               env:
-                  # ID we provide to cirrus, to verify the correct operation was performed.
+                  # ID invented here to verify the operation performed.
                   UUID: ${{github.run_id}}.${{steps.retro.outputs.prn}}.${{steps.retro.outputs.sha}}
               run: |
+                  trap "history -c" EXIT
                   curl --request POST \
                     --url https://api.cirrus-ci.com/graphql \
                     --header '${{ secrets.CIRRUS_CI_AUTH_HEADER }}' \
                     --header 'content-type: application/json' \
                     --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' \
-                    > ./test_artifacts/manual.json
+                    > ./test_artifacts/action_task_trigger.json
 
                   actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/manual.json)
                   echo "Verifying returned tracking value"
                   test "$actual" == "$UUID"
 
-            # Workflow against a PR was successful, provide that feedback in the PR
-            - if: steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'paused'
-              name: Final status comment on PR
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Update comment on workflow success
               uses: jungwinter/comment@v1
               with:
                   type: 'edit'
                   comment_id: '${{ steps.edit_pr_comment_exec.outputs.id }}'
                   token: '${{ secrets.GITHUB_TOKEN }}'
                   body: >-
-                      Successfully ran test cirrus-ci_retrospective from this PR's
-                      [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
-                      [Results
-                      and artifacts are now
-                      available.](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      Successfully triggered [${{ env.ACTION_TASK }}
+                      task](https://cirrus-ci.com/task/${{ steps.retro.outputs.tid }}?command=main#L0)
+                      to indicate
+                      successful run of [cirrus-ci_retrospective integration
+                      testing](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      from this PR's
+                      [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}}).
 
-            # The debug.sh script provides verbose output not suitable for logging.
-            # Provide an archive of files for debugging/analysis.
-            - if: always() && steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
-              name: Archive event, build, and debugging output
-              uses: actions/upload-artifact@v1.0.0
-              with:
-                  name: pr_${{ steps.retro.outputs.prn }}_test_artifacts_${{ steps.retro.outputs.sha }}.zip
-                  path: ./test_artifacts
-
-            # In case there was a problem, provide details about what might have gone wrong.
-            - if: always() && steps.retro.outputs.was_pr == 'true'  && steps.retro.outputs.tst == 'paused'
-              name: Debug latest upstream cirrus-ci_retrospective output Values
-              run: |
-                  echo "Analysis Result:"
-                  echo "Was PR: ${{ steps.retro.outputs.was_pr }}"
-                  echo "PR Number: ${{ steps.retro.outputs.prn }}"
-                  echo "Task ID was: ${{ steps.retro.outputs.tid }}"
-                  echo "SHA: ${{ steps.retro.outputs.sha }}"
-                  echo ""
-                  echo "Analyzed Cirrus-CI task:"
-                  jq --indent 4 --color-output '.[] | select(.name == "cirrus-ci/test_manual")' ./cirrus-ci_retrospective.json
-
-            # Workflow against a PR was cancelled for some reason,
-            # This can happen because of --force push, manual button press, or some other cause.
-            - if: cancelled() && steps.retro.outputs.was_pr == 'true'
-              name: Clear comment on workflow cancel
-              uses: jungwinter/comment@v1
-              with:
-                  type: 'edit'
-                  comment_id: '${{ steps.create_pr_comment.outputs.id }}'
-                  token: '${{ secrets.GITHUB_TOKEN }}'
-                  # Don't leave unnecessary clutter comments in the PR, erase them.
-                  body: '[Cancelled](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})'
-
-            # Provide feedback to PR.
-            - if: failure() && steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst == 'paused'
-              name: Add comment on workflow failure
+            - if: failure() && steps.retro.outputs.do_intg == 'true'
+              name: Update comment on workflow failure
               uses: jungwinter/comment@v1
               with:
                   type: 'edit'
@@ -309,36 +310,20 @@ jobs:
                       failed against this PR's
                       [${{ steps.retro.outputs.sha }}](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})
 
-
-    debug_cirrus-ci_retrospective:
-        if: github.event.check_suite.app.name == 'Cirrus CI'
-        runs-on: ubuntu-latest
-        steps:
-            # Do this in parallel for simplicity since it's just for debugging
-            # purposes.  Assume it will execute the same/similar to the regular job
-            # above.
-            - name: Execute latest upstream cirrus-ci_retrospective
-              id: cirrus-ci_retrospective
-              uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
-              env:
-                GITHUB_TOKEN: ${{ github.token }}
-
-            - if: always()
-              name: Collect the originating event and result JSON
-              run: cp "${{ github.event_path }}" ./
-
-            - if: always()
-              name: Log colorized and formatted event JSON
-              run: jq --indent 4 --color-output . ./event.json
-
-            - if: always()
-              name: Log colorized and formatted cirrus-ci_retrospective JSON
-              run: jq --indent 4 --color-output . ./cirrus-ci_retrospective.json
-
-            - if: always()
-              uses: actions/upload-artifact@v1.0.0
-              name: Archive triggering event JSON and latest cirrus-ci_retrospective output
+            # This can happen because of --force push, manual cancel button press, or some other cause.
+            - if: cancelled() && steps.retro.outputs.do_intg == 'true'
+              name: Update comment on workflow cancellation
+              uses: jungwinter/comment@v1
               with:
-                  # There is no way to avoid this being zipped :(
-                  name: debug_cirrus-ci_retrospective.zip
-                  path: ./
+                  type: 'edit'
+                  comment_id: '${{ steps.create_pr_comment.outputs.id }}'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: '[Cancelled](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})'
+
+            # Provide an archive of files for debugging/analysis.
+            - if: always() && steps.retro.outputs.do_intg == 'true'
+              name: Archive event, build, and debugging output
+              uses: actions/upload-artifact@v1.0.0
+              with:
+                  name: pr_${{ steps.retro.outputs.prn }}_debug.zip
+                  path: ./test_artifacts
