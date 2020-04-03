@@ -13,7 +13,7 @@ container:
 
 
 # Actual testing task for code in this repo.
-cirrus-ci/actual_test_task:
+cirrus-ci/test_task:
     env:
         CIRRUS_CLONE_DEPTH: 0
     script:
@@ -30,20 +30,21 @@ cirrus-ci/test_passing_task:
         test_artifacts:
             path: '*.log'
 
-# CI-Testing that must be manually triggered
-cirrus-ci/test_manual_task:
-    depends_on:
-        - cirrus-ci/actual_test
-        - cirrus-ci/test_passing
+
+# Represent secondary Github Action based testing (Required for merge)
+github-actions/success_task:
+    # Note: ***DO NOT*** manually trigger this task under normal circumstances.
+    #       It is triggered automatically by the cirrus-ci_retrospective
+    #       Github Action.  This action is responsible for testing the PR changes
+    #       to the action itself.
     trigger_type: manual
-    # Only required for PRs
+    # Only required for PRs, never tag or branch testing
     only_if: $CIRRUS_BRANCH != $DEST_BRANCH
-    script:
-        - echo "$CIRRUS_BUILD_ID/$CIRRUS_TASK_ID/manual" > manual_output.log
-        - true
-    always: &results
-        test_artifacts:
-            path: '*.log'
+    depends_on:
+        - cirrus-ci/test
+    script: >-
+        echo "Related Github Action Workflow: https://github.com/${CIRRUS_REPO_FULL_NAME}/actions/runs/${GITHUB_CHECK_SUITE_ID}"
+
 
 # CI-Testing (itself) task that always fails in PRs + uploads simple artifact
 # cirrus-ci/test_failing_task:
@@ -54,8 +55,8 @@ cirrus-ci/test_manual_task:
 #         <<: *results
 
 
-cirrus-ci/test_success_task:
+cirrus-ci/success_task:
     depends_on:
-        - cirrus-ci/actual_test
+        - cirrus-ci/test
         - cirrus-ci/test_passing
         # - cirrus-ci/test_failing
