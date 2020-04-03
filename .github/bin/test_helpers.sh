@@ -5,7 +5,7 @@
 
 SCRIPT_DIR=$(dirname "${BASH_SOURCE[0]}")
 testbin() {
-    fp="$SCRIPT_DIR/bin/$1"
+    fp="$SCRIPT_DIR/$1"
     if [[ ! -r "$fp" ]] || [[ -x "$fp" ]]; then
         echo "::error::Should be readable but not executable: $fp"
         exit 2
