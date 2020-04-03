@@ -20,7 +20,7 @@ env:
     # Authoritative Github Action task (in cirrus-ci) to trigger / check for completion of _this_ workflow
     ACTION_TASK: 'github-actions/success'
     # Directory containing helper scripts for this workflow
-    HELPER_DIRPATH: '.github/bin/'
+    HELPER_SUBDIR: '.github/bin/'
 
 jobs:
     # Obtain task details and validate required execution conditions
