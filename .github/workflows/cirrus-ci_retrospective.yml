@@ -19,35 +19,8 @@ env:
     MONITOR_TASK: 'cirrus-ci/success'
     # Authoritative Github Action task (in cirrus-ci) to trigger / check for completion of _this_ workflow
     ACTION_TASK: 'github-actions/success'
-    # These same variables and filters need to be used multiple times under varying conditions
-    set_task_vars: |
-        prn=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.pullRequest' ./cirrus-ci_retrospective.json)
-        tid=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .id' ./cirrus-ci_retrospective.json)
-        sha=$(jq --raw-output '.[] | select(.name == "${MONITOR_TASK}") | .build.changeIdInRepo' ./cirrus-ci_retrospective.json)
-        tst=$(jq --raw-output '.[] | select(.name == "${ACTION_TASK}") | .status' ./cirrus-ci_retrospective.json)
-        was_pr='false'
-        do_intg='false'
-        if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]]; then
-            was_pr='true'
-            if [[ -n "$tst" ]] && [[ "$tst" == "paused" ]]; then
-                do_intg='true'
-            fi
-        fi
-    # Help debug filter/data problems
-    debug_task_vars: |
-        echo "Shell variables set:"
-        ${set_task_vars}
-        echo "Cirrus-CI ran on pr: $was_pr"
-        echo "Monitor PR Number: ${prn}"
-        echo "Monitor SHA: ${sha}"
-        echo "Action Task ID was: ${tid}"
-        echo "Action Task Status: ${tst}"
-        echo "Do integration testing: ${do_intg}"
-        echo ""
-        echo "Analyzed Cirrus-CI monitoring task:"
-        jq --indent 4 --color-output '.[] | select(.name == "${MONITOR_TASK}")' ./cirrus-ci_retrospective.json
-        echo "Analyzed Cirrus-CI action task:"
-        jq --indent 4 --color-output '.[] | select(.name == "${ACTION_TASK}")' ./cirrus-ci_retrospective.json
+    # Directory containing helper scripts for this workflow
+    HELPER_DIRPATH: '.github/bin/'
 
 jobs:
     # Obtain task details and validate required execution conditions
@@ -64,27 +37,28 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
-            # Consume the output JSON from running the container (above).
-            # This could be made into a complete/sophisticated script.  However,
-            # In this workflow, if the build was on PR in this repo, we will be
-            # re-execute the PR version of the container anyway, so this can
-            # remain simple inline commands.
+            - name: Clone master branch repository code
+              uses: actions/checkout@v2
+              with:
+                  fetch-depth: 1
+                  path: ./master
+                  # DO NOT build-in any unnecessary permissions
+                  persist-credentials: 'false'
+
+            - name: Validate helper scripts before use
+              run: |
+                  source ./master/$HELPER_SUBDIR/test_helpers.sh
+
             - name: Check output for a Cirrus-CI build versus Pull Request
               id: retro
-              shell: bash
               run: |
-                  ${set_task_vars}
-                  printf "\n::set-output name=was_pr::%s\n" "$was_pr"
-                  printf "\n::set-output name=prn::%d\n" "$prn"
-                  printf "\n::set-output name=tid::%s\n" "$tid"
-                  printf "\n::set-output name=sha::%s\n" "$sha"
-                  printf "\n::set-output name=tst::%s\n" "$tst"
+                  source ./master/$HELPER_SUBDIR/set_action_vars.sh
 
             # In case there was a problem, provide details about what might have gone wrong.
             - if: always()
               name: Debug latest upstream cirrus-ci_retrospective output Values
               run: |
-                  ${debug_task_vars}
+                  source ./master/$HELPER_SUBDIR/debug_task_vars.sh
 
             # Negative case, abnormal workflow ($ACTION-TASK task already ran / not paused).
             - if: steps.retro.outputs.was_pr == 'true' && steps.retro.outputs.tst != 'paused'
@@ -119,20 +93,26 @@ jobs:
               env:
                 GITHUB_TOKEN: ${{ github.token }}
 
+            - name: Clone master branch repository code
+              uses: actions/checkout@v2
+              with:
+                  fetch-depth: 1
+                  path: ./master
+                  # DO NOT build-in any unnecessary permissions
+                  persist-credentials: 'false'
+
+            - name: Validate helper scripts before use
+              run: |
+                  source ./master/$HELPER_SUBDIR/test_helpers.sh
+
             - name: Check output for a Cirrus-CI build versus Pull Request
               id: retro
-              shell: bash
               run: |
-                  ${set_task_vars}
-                  printf "\n::set-output name=prn::%d\n" "$prn"
-                  printf "\n::set-output name=tid::%s\n" "$tid"
-                  printf "\n::set-output name=sha::%s\n" "$sha"
-                  printf "\n::set-output name=tst::%s\n" "$tst"
-                  printf "\n::set-output name=do_intg::%s\n" "$do_intg"
-
-            # Same failure condition as smoke job
-            - if: steps.retro.outputs.do_intg != 'true'
-              run: exit 1
+                  source ./master/$HELPER_SUBDIR/set_action_vars.sh
+                  if [[ "$do_intg" != "true" ]]; then
+                      printf "::error::Expecting \$do_intg to be 'true', not '$do_intg'"
+                      exit 1
+                  fi
 
             # Provide feedback in PR for normal workflow ($ACTION-TASK task has not run).
             - if: steps.retro.outputs.do_intg == 'true'
@@ -182,6 +162,11 @@ jobs:
                   git fetch origin "${{ steps.retro.outputs.sha }}"
                   git checkout -b 'pr${{ steps.retro.outputs.prn }}' FETCH_HEAD
                   git log -1 | tee ../test_artifacts/commit.txt
+
+            - if: steps.retro.outputs.do_intg == 'true'
+              name: Validate github action helper scripts from PR
+              run: |
+                  source ./pull_request/$HELPER_SUBDIR/test_helpers.sh
 
             # Update the comment posted to the PR, replace it's content with the current
             # execution status and links.
@@ -246,10 +231,9 @@ jobs:
 
             - if: steps.retro.outputs.do_intg == 'true'
               name: Verify output JSON from test container parses for future use by this workflow
-              shell: bash
               run: |
+                  source ./pull_request/$HELPER_SUBDIR/debug_task_vars.sh
                   cd test_artifacts
-                  ${debug_task_vars}
                   err() { a=$1; e=$2; echo "::error::Test container \$$a='${!a}', expecting '$e'"; exit 1; }
                   if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
                       err prn "${{ steps.retro.outputs.prn }}"
