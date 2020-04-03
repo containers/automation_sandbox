@@ -303,3 +303,27 @@ jobs:
               with:
                   name: pr_${{ steps.retro.outputs.prn }}_debug.zip
                   path: ./test_artifacts
+
+    debug:
+        if: github.event.check_suite.app.name == 'Cirrus CI'
+        runs-on: ubuntu-latest
+        steps:
+            - name: Collect the originating event and result JSON
+              run: cp "${{ github.event_path }}" ./
+
+            - name: Log colorized and formatted event JSON
+              run: jq --indent 4 --color-output . ./event.json
+
+            # Do this in parallel for simplicity since it's just for debugging
+            # purposes.  Assume it will execute the same/similar to the regular job
+            # above.
+            - if: always()
+              name: Execute latest upstream cirrus-ci_retrospective
+              id: cirrus-ci_retrospective
+              uses: docker://quay.io/libpod/cirrus-ci_retrospective:latest
+              env:
+                GITHUB_TOKEN: ${{ github.token }}
+
+            - if: always()
+              name: Log colorized and formatted cirrus-ci_retrospective JSON
+              run: jq --indent 4 --color-output . ./cirrus-ci_retrospective.json
