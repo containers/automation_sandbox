@@ -86,6 +86,8 @@ jobs:
     # Execute in parallel with smoke (above) to improve overall performance
     cirrus-ci_retrospective:
         if: github.event.check_suite.app.name == 'Cirrus CI'
+        needs:
+            - cirrus-ci_retrospective_smoke
         runs-on: ubuntu-latest
         steps:
             - name: Execute latest upstream cirrus-ci_retrospective
