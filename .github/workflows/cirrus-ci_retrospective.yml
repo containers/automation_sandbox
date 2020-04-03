@@ -36,7 +36,7 @@ env:
     # Help debug filter/data problems
     debug_task_vars: |
         echo "Shell variables set:"
-        ${{ env.set_task_vars }}
+        ${set_task_vars}
         echo "Cirrus-CI ran on pr: $was_pr"
         echo "Monitor PR Number: ${prn}"
         echo "Monitor SHA: ${sha}"
@@ -249,7 +249,6 @@ jobs:
               shell: bash
               run: |
                   cd test_artifacts
-                  ${set_task_vars}
                   ${debug_task_vars}
                   err() { a=$1; e=$2; echo "::error::Test container \$$a='${!a}', expecting '$e'"; exit 1; }
                   if [[ -z "$prn" ]] || [[ "$prn" != "${{ steps.retro.outputs.prn }}" ]]; then
