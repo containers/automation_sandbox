@@ -13,8 +13,8 @@ testbin() {
 }
 
 nf="$(ls -1 $SCRIPT_DIR | wc -l)"
-if [[ $nf -ne 3 ]]; then
-    echo "::error::Expecting exactly 3 files, found $nf"
+if [[ $nf -ne 4 ]]; then
+    echo "::error::Expecting exactly 4 files, found $nf"
     exit 3
 fi
 
