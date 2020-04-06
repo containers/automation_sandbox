@@ -57,7 +57,7 @@ load_ccir() {
     if [[ -n "$prn" ]] && [[ "$prn" != "null" ]] && [[ $prn -gt 0 ]]; then
         dbg "Detected pull request $prn"
         was_pr='true'
-        if [[ -n "$tst" ]] && [[ "$tst" == "paused" ]]; then
+        if [[ -n "$tst" ]] && [[ "$tst" == "PAUSED" ]]; then
             dbg "Detected action status $tst"
             do_intg='true'
         fi
