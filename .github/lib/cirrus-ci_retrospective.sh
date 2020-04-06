@@ -37,12 +37,12 @@ load_ccir() {
     [[ -n "$ACTION_TASK" ]] || \
         die "Expecting \$MONITOR_TASK to be non-empty"
 
-    dbg "Loading Cirrus-CI monitoring task $MONITOR_TASK:"
+    dbg "--Loading Cirrus-CI monitoring task $MONITOR_TASK--"
     dbg "$(jq --indent 4 '.[] | select(.name == "'${MONITOR_TASK}'")' $ccirjson)"
     prn=$(jq --raw-output '.[] | select(.name == "'${MONITOR_TASK}'") | .build.pullRequest' "$ccirjson")
     sha=$(jq --raw-output '.[] | select(.name == "'${MONITOR_TASK}'") | .build.changeIdInRepo' "$ccirjson")
 
-    dbg "Loadinng Cirrus-CI action task $ACTION_TASK:"
+    dbg "--Loadinng Cirrus-CI action task $ACTION_TASK--"
     dbg "$(jq --indent 4 '.[] | select(.name == "'${ACTION_TASK}'")' $ccirjson)"
     tid=$(jq --raw-output '.[] | select(.name == "'${ACTION_TASK}'") | .id' "$ccirjson")
     tst=$(jq --raw-output '.[] | select(.name == "'${ACTION_TASK}'") | .status' "$ccirjson")

@@ -48,36 +48,12 @@ jobs:
 
             - name: Load cirrus-ci_retrospective JSON and set action output variables
               id: retro
+              env:
+                  DEBUG: 1
               run: |
                   source ./master/$HELPER_LIB
                   load_ccir $GITHUB_WORKSPACE
                   set_ccir
-                  DEBUG=1 dbg_ccir
-
-            # Negative case, abnormal workflow ($ACTION-TASK task already ran / not paused on a PR).
-            - if: steps.retro.outputs.is_pr == 'true' && steps.retro.outputs.do_intg != 'true'
-              id: create_error_pr_comment
-              name: Create an error status comment in the PR
-              # Ref: https://github.com/marketplace/actions/comment-action
-              uses: jungwinter/comment@v1
-              with:
-                  issue_number: '${{ steps.retro.outputs.prn }}'
-                  type: 'create'
-                  token: '${{ secrets.GITHUB_TOKEN }}'
-                  body: >-
-                      ***ERROR***: [cirrus-ci_retrospective
-                      action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
-                      found `${{ env.ACTION_TASK }}` task with unexpected `${{ steps.retro.outputs.tst }}`
-                      status. This task should never be triggered manually (or multiple times) under normal
-                      circumstances.
-
-            # Negative case followup, fail the build with an error
-            - if: steps.retro.outputs.is_pr == 'true' && steps.retro.outputs.do_intg != 'true'
-              run: >-
-                  printf "::error::Found ${ACTION_TASK} with unexpected ${{ steps.retro.outputs.tst }} status"
-                  exit 1
-
-            # Otherwise: if steps.retro.outputs.do_intg != 'true', it was a branch or tag push: ignore it.
 
             # Provide feedback in PR for normal workflow ($ACTION-TASK task has not run).
             - if: steps.retro.outputs.do_intg == 'true'
@@ -275,6 +251,29 @@ jobs:
                   comment_id: '${{ steps.create_pr_comment.outputs.id }}'
                   token: '${{ secrets.GITHUB_TOKEN }}'
                   body: '[Cancelled](https://github.com/${{github.repository}}/pull/${{steps.retro.outputs.prn}}/commits/${{steps.retro.outputs.sha}})'
+
+            # Abnormal workflow ($ACTION-TASK task already ran / not paused on a PR).
+            - if: steps.retro.outputs.is_pr == 'true' && steps.retro.outputs.do_intg != 'true'
+              id: create_error_pr_comment
+              name: Create an error status comment in the PR
+              # Ref: https://github.com/marketplace/actions/comment-action
+              uses: jungwinter/comment@v1
+              with:
+                  issue_number: '${{ steps.retro.outputs.prn }}'
+                  type: 'create'
+                  token: '${{ secrets.GITHUB_TOKEN }}'
+                  body: >-
+                      ***ERROR***: [cirrus-ci_retrospective
+                      action](https://github.com/${{github.repository}}/actions/runs/${{github.run_id}})
+                      found `${{ env.ACTION_TASK }}` task with unexpected `${{ steps.retro.outputs.tst }}`
+                      status. This task should never be triggered manually (or multiple times) under normal
+                      circumstances.
+
+            # Negative case followup, fail the build with an error status
+            - if: steps.retro.outputs.is_pr == 'true' && steps.retro.outputs.do_intg != 'true'
+              run: >-
+                  printf "::error::Found ${ACTION_TASK} with unexpected ${{ steps.retro.outputs.tst }} status"
+                  exit 1
 
             # Provide an archive of files for debugging/analysis.
             - if: always() && steps.retro.outputs.do_intg == 'true'
