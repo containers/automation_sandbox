@@ -205,7 +205,6 @@ jobs:
               run: |
                   set +x
                   trap "history -c" EXIT
-                  cd master
                   curl --request POST \
                     --url https://api.cirrus-ci.com/graphql \
                     --header "Authorization: Bearer ${{ secrets.CIRRUS_API_TOKEN }}" \
