@@ -203,16 +203,18 @@ jobs:
                   # ID invented here to verify the operation performed.
                   UUID: ${{github.run_id}}.${{steps.retro.outputs.prn}}.${{steps.retro.outputs.sha}}
               run: |
+                  set +x
                   trap "history -c" EXIT
+                  cd master
                   curl --request POST \
                     --url https://api.cirrus-ci.com/graphql \
-                    --header '${{ secrets.CIRRUS_CI_AUTH_HEADER }}' \
+                    --header "Authorization: Bearer ${{ secrets.CIRRUS_API_TOKEN }}" \
                     --header 'content-type: application/json' \
                     --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' \
                     > ./test_artifacts/action_task_trigger.json
 
                   actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/manual.json)
-                  echo "Verifying returned tracking value"
+                  echo "Verifying '$UUID' matches returned tracking value '$actual'"
                   test "$actual" == "$UUID"
 
             - if: steps.retro.outputs.do_intg == 'true'
