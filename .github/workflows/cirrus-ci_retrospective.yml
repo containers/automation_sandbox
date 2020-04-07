@@ -212,7 +212,7 @@ jobs:
                     --data '{"query":"mutation {\n  trigger(input: {taskId: \"${{steps.retro.outputs.tid}}\", clientMutationId: \"${{env.UUID}}\"}) {\n    clientMutationId\n    task {\n      name\n    }\n  }\n}"}' \
                     > ./test_artifacts/action_task_trigger.json
 
-                  actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/manual.json)
+                  actual=$(jq --raw-output '.data.trigger.clientMutationId' ./test_artifacts/action_task_trigger.json)
                   echo "Verifying '$UUID' matches returned tracking value '$actual'"
                   test "$actual" == "$UUID"
 
