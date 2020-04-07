@@ -22,6 +22,9 @@ env:
     # Relative locations to help with safe use and testing
     HELPER_LIB: '.github/lib/cirrus-ci_retrospective.sh'
     HELPER_LIB_TEST: '.github/test/cirrus-ci_retrospective.sh'
+    # Enable debugging of github actions itself
+    # (see https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-a-debug-message)
+    ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
 
 jobs:
     # Obtain task details and validate required execution conditions
