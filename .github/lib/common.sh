@@ -22,5 +22,5 @@ set_out_var() {
         die "Expecting first parameter to be non-empty value for the output variable name"
     dbg "Setting Github Action step output variable '$name' to '$value'"
     # Special string recognized by Github Actions
-    printf "\n::set-output name=$name::%s\n" "value"
+    printf "\n::set-output name=$name::%s\n" "$value"
 }

@@ -89,7 +89,7 @@ done
 # Remaining tests all require debuging output disabled
 DEBUG=0
 
-write_ccir 1 2 3 paused COMPLETED
+write_ccir 1 2 3 PAUSED COMPLETED
 load_ccir "$TESTTEMPDIR"
 for var in was_pr do_intg; do
     test_cmd "Verify JSON for a pull request sets \$$var=true" \
@@ -104,7 +104,7 @@ for stat in COMPLETED ABORTED FAILED YOMAMA SUCCESS SUCCESSFUL FAILURE; do
         0 '^false' \
         echo $do_intg
 
-    write_ccir 1 2 3 paused $stat
+    write_ccir 1 2 3 PAUSED $stat
     load_ccir "$TESTTEMPDIR"
     test_cmd "Verify JSON for a pull request sets \$do_intg=true when monitor status is $stat" \
         0 '^true' \
@@ -112,7 +112,7 @@ for stat in COMPLETED ABORTED FAILED YOMAMA SUCCESS SUCCESSFUL FAILURE; do
 done
 
 for pr in "true" "false" "null" "0"; do
-    write_ccir 1 "$pr" 3 paused COMPLETED
+    write_ccir 1 "$pr" 3 PAUSED COMPLETED
     load_ccir "$TESTTEMPDIR"
     test_cmd "Verify \$do_intg=false and \$was_pr=false when JSON sets pullRequest=$pr" \
         0 '^falsefalse' \

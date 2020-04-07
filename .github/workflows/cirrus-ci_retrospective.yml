@@ -21,7 +21,7 @@ env:
     ACTION_TASK: 'github-actions/success'
     # Relative locations to help with safe use and testing
     HELPER_LIB: '.github/lib/cirrus-ci_retrospective.sh'
-    HELPER_LIB_TEST: '.github/test/cirrus-ci_retrospective.sh'
+    HELPER_LIB_TEST: '.github/test/run_all_tests.sh'
     # Enable debugging of github actions itself
     # (see https://help.github.com/en/actions/reference/workflow-commands-for-github-actions#setting-a-debug-message)
     ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
@@ -177,8 +177,6 @@ jobs:
             - if: steps.retro.outputs.do_intg == 'true'
               id: pr_retro
               name: Verify output JSON from test container parses for future use by this workflow
-              env:
-                  DEBUG: 1
               run: |
                   cd pull_request
                   source ./$HELPER_LIB
