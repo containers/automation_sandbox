@@ -177,23 +177,24 @@ jobs:
             - if: steps.retro.outputs.do_intg == 'true'
               id: pr_retro
               name: Verify output JSON from test container parses for future use by this workflow
+              env:
+                  DEBUG: 1
               run: |
                   cd pull_request
                   source ./$HELPER_LIB
                   load_ccir $GITHUB_WORKSPACE/test_artifacts
-                  dbg_ccir
                   set_ccir
 
             - if: steps.retro.outputs.do_intg == 'true'
               name: Validate PR output values match expected values
               run: |
-                  samesame() { if [[ -z "$1" ]] || [[ "$1" != "$2" ]]; then echo "::error::Expecting $1 '$2' to equal '$3'"; exit 1; fi }
-                  samesame "steps.pr_retro.prn" "${{ steps.pr_retro.prn }}" "${{ steps.retro.outputs.prn }}"
-                  samesame "steps.pr_retro.was_pr" "${{ steps.pr_retro.was_pr }}" "${{ steps.retro.outputs.was_pr }}"
-                  samesame "steps.pr_retro.tid" "${{ steps.pr_retro.tid }}" "${{ steps.retro.outputs.tid }}"
-                  samesame "steps.pr_retro.sha" "${{ steps.pr_retro.sha }}" "${{ steps.retro.outputs.sha }}"
-                  samesame "steps.pr_retro.tst" "${{ steps.pr_retro.tst }}" "${{ steps.retro.outputs.tst }}"
-                  samesame "steps.pr_retro.do_intg" "${{ steps.pr_retro.do_intg }}" "${{ steps.retro.outputs.do_intg }}"
+                  samesame() { if [[ -z "$1" ]] || [[ "$2" != "$3" ]]; then echo "::error::Expecting $1 '$2' to equal '$3'"; exit 1; fi }
+                  samesame "steps.pr_retro.outputs.prn" "${{ steps.pr_retro.outputs.prn }}" "${{ steps.retro.outputs.prn }}"
+                  samesame "steps.pr_retro.outputs.was_pr" "${{ steps.pr_retro.outputs.was_pr }}" "${{ steps.retro.outputs.was_pr }}"
+                  samesame "steps.pr_retro.outputs.tid" "${{ steps.pr_retro.outputs.tid }}" "${{ steps.retro.outputs.tid }}"
+                  samesame "steps.pr_retro.outputs.sha" "${{ steps.pr_retro.outputs.sha }}" "${{ steps.retro.outputs.sha }}"
+                  samesame "steps.pr_retro.outputs.tst" "${{ steps.pr_retro.outputs.tst }}" "${{ steps.retro.outputs.tst }}"
+                  samesame "steps.pr_retro.outputs.do_intg" "${{ steps.pr_retro.outputs.do_intg }}" "${{ steps.retro.outputs.do_intg }}"
 
             # Allow PR to be merged by triggering required action-status marker task in Cirrus CI
             - if: steps.retro.outputs.do_intg == 'true'
