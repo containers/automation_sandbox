@@ -46,6 +46,7 @@ jobs:
               #     ABORTED   == Task or dependency Failure
               #     PAUSED    == Awaiting manual trigger
               #     CANCELED  == Manually canceled task or dependency
+              #     TRIGGERED == Pre-scheduling
               #     SCHEDULED == Queued to run
               #     CREATED   == Waiting for full Queue
               run: |
