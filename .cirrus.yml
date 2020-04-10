@@ -1,13 +1,5 @@
 ---
 
-# Only github users with write-access can define or use encrypted variables
-# This credential represents a service account with access to manage both VMs
-# and storage.
-gcp_credentials: ENCRYPTED[885c6e4297dd8d6f67593c42b810353af0c505a7a670e2c6fd830c56e86bbb2debcc3c18f942d0d46ab36b63521061d4]
-
-# Default timeout for each task
-timeout_in: 120m
-
 # Main collection of env. vars to set for all tasks and scripts.
 env:
     ####
@@ -62,32 +54,11 @@ env:
     ADD_SECOND_PARTITION: 'false'  # will certainly fail inside containers
     MOD_LIBPOD_CONF: 'true'  # Update libpod.conf runtime if required by OS environment
 
-    ####
-    #### Credentials and other secret-sauces, decrypted at runtime when authorized.
-    ####
-    # Freenode IRC credentials for posting status messages
-    IRCID: ENCRYPTED[1913f8a4572b6a6d2036232327789c4f6c0d98cde53f0336d860cd219b4cbd83863eefd93471aef8fa1079d4698e382d]
-    # Needed to build GCE images, within a GCE VM
-    SERVICE_ACCOUNT: ENCRYPTED[99e9a0b1c23f8dd29e83dfdf164f064cfd17afd9b895ca3b5e4c41170bd4290a8366fe2ad8e7a210b9f751711d1d002a]
-    # User ID for cirrus to ssh into VMs
-    GCE_SSH_USERNAME: cirrus-ci
-    # Name where this repositories cloud resources are located
-    GCP_PROJECT_ID: ENCRYPTED[7c80e728e046b1c76147afd156a32c1c57d4a1ac1eab93b7e68e718c61ca8564fc61fef815952b8ae0a64e7034b8fe4f]
-    RELEASE_GCPJSON: ENCRYPTED[789d8f7e9a5972ce350fd8e60f1032ccbf4a35c3938b604774b711aad280e12c21faf10e25af1e0ba33597ffb9e39e46]
-    RELEASE_GCPNAME: ENCRYPTED[417d50488a4bd197bcc925ba6574de5823b97e68db1a17e3a5fde4bcf26576987345e75f8d9ea1c15a156b4612c072a1]
-    RELEASE_GCPROJECT: ENCRYPTED[7c80e728e046b1c76147afd156a32c1c57d4a1ac1eab93b7e68e718c61ca8564fc61fef815952b8ae0a64e7034b8fe4f]
 
-
-
-# Default VM to use unless set or modified by task
-gce_instance:
-    image_project: "libpod-218412"
-    zone: "us-central1-a"  # Required by Cirrus for the time being
-    cpu: 2
-    memory: "4Gb"
-    disk: 200
-    # A matrix could be used here, for now just one VM
-    image_name: "${FEDORA_CACHE_IMAGE_NAME}"
+container:
+    image: "${GATE_IMAGE_FQIN}"
+    cpu: 1
+    memory: 1
 
 
 # Every *_task runs in parallel in separate VMsd. The name prefix only for reference
@@ -98,57 +69,8 @@ gating_task:
     # Only run this on PRs, never during post-merge testing (for speed).
     only_if: $CIRRUS_BRANCH != $DEST_BRANCH
 
-    env:
-        CIRRUS_WORKING_DIR: "/usr/src/libpod"
-        SRCPATH: "$CIRRUS_WORKING_DIR"
-
-    # Runs within Cirrus's "community cluster"
-    container:
-        # Note: Image has dual purpose, see contrib/gate/README.md
-        # The entrypoint.sh script ensures a prestine copy of $SRCPATH is
-        # available at $GOSRC before executing make instructions.
-        image: "${GATE_IMAGE_FQIN}"
-        cpu: 8
-        memory: 12
-
-    timeout_in: 20m
-
-    # Custom cloning is required to satisfy lint/validation needs
-    clone_script: |
-        git clone --recursive --branch=$DEST_BRANCH https://x-access-token:${CIRRUS_REPO_CLONE_TOKEN}@github.com/${CIRRUS_REPO_FULL_NAME}.git $CIRRUS_WORKING_DIR
-        git remote update origin
-        if [[ -n "$CIRRUS_PR" ]]; then # running for a PR
-            git fetch origin pull/$CIRRUS_PR/head:pull/$CIRRUS_PR
-            git checkout pull/$CIRRUS_PR
-        fi
-        git reset --hard $CIRRUS_CHANGE_IN_REPO
-
-    # Don't bother going further if something is down
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-
-    gate_script:
-        # N/B: entrypoint.sh resets $GOSRC (same as make clean)
-        - '/usr/local/bin/entrypoint.sh install.tools |& ${TIMESTAMP}'
-        - '/usr/local/bin/entrypoint.sh validate |& ${TIMESTAMP}'
-
-    # This task builds Podman with different buildtags to ensure the build does
-    # not break.  It also verifies all sub-commands have man pages.
-    build_script:
-        - '/usr/local/bin/entrypoint.sh podman |& ${TIMESTAMP}'
-        - 'cd $GOSRC && ./hack/podman-commands.sh |& ${TIMESTAMP}'
-        # N/B: need 'clean' so some committed files are re-generated.
-        - '/usr/local/bin/entrypoint.sh clean podman-remote |& ${TIMESTAMP}'
-        - '/usr/local/bin/entrypoint.sh clean podman xref_helpmsgs_manpages BUILDTAGS="exclude_graphdriver_devicemapper selinux seccomp" |& ${TIMESTAMP}'
-        - '/usr/local/bin/entrypoint.sh local-cross |& ${TIMESTAMP}'
-
-    # Verify some aspects of ci/related scripts
-    ci_script:
-        - '${GOSRC}/${SCRIPT_BASE}/lib.sh.t |& ${TIMESTAMP}'
-        - '/usr/local/bin/entrypoint.sh -C ${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/packer test'
-        - '${GOSRC}/${SCRIPT_BASE}/cirrus_yaml_test.py |& ${TIMESTAMP}'
-
-    # Verify expected bash environment (-o pipefail)
-    pipefail_enabledscript: 'if /bin/false | /bin/true; then echo "pipefail fault" && exit 72; fi'
+    # NoOp
+    script: /bin/true
 
 
 # This task checks to make sure that we can still build an rpm from the
@@ -162,17 +84,9 @@ rpmbuild_task:
 
     depends_on:
         - "gating"
-    env:
-        CIRRUS_WORKING_DIR: "/usr/src/libpod"
 
-    container:
-        image: quay.io/libpod/rpmbuild:$DEST_BRANCH
-        cpu: 2
-        memory: 4
-
-    rpmbuild_script:
-        - 'make -C ${CIRRUS_WORKING_DIR} -f ${CIRRUS_WORKING_DIR}/.copr/Makefile'
-        - 'rpmbuild --rebuild ${CIRRUS_WORKING_DIR}/podman-*.src.rpm'
+    # NoOp
+    script: /bin/true
 
 
 # This task runs `make vendor` followed by ./hack/tree_status.sh to check
@@ -188,22 +102,8 @@ vendor_task:
     depends_on:
         - "gating"
 
-    env:
-        CIRRUS_WORKING_DIR: "/var/tmp/go/src/github.com/containers/libpod"
-        GOPATH: "/var/tmp/go"
-        GOSRC: "$CIRRUS_WORKING_DIR"
-
-    # Runs within Cirrus's "community cluster"
-    container:
-        image: docker.io/library/golang:1.13
-        cpu: 4
-        memory: 12
-
-    timeout_in: 30m
-
-    vendor_script:
-        - 'cd ${CIRRUS_WORKING_DIR} && make vendor'
-        - 'cd ${CIRRUS_WORKING_DIR} && ./hack/tree_status.sh'
+    # NoOp
+    script: /bin/true
 
 
 # This task runs `make varlink_api_generate` followed by ./hack/tree_status.sh to check
@@ -217,25 +117,8 @@ varlink_api_task:
     depends_on:
         - "gating"
 
-    env:
-        CIRRUS_WORKING_DIR: "/usr/src/libpod"
-        SRCPATH: "$CIRRUS_WORKING_DIR"
-        EPOCH_TEST_COMMIT: "${CIRRUS_BASE_SHA}"  # repo clone missing this data
-        # Used by tree_status.sh
-        SUGGESTION: 'remove API.md, then "make varlink_api_generate" and commit changes.'
-
-    # Runs within Cirrus's "community cluster"
-    container:
-        # Note: Image has dual purpose, see contrib/gate/README.md
-        image: "${GATE_IMAGE_FQIN}"
-        cpu: 4
-        memory: 12
-
-    timeout_in: 10m
-
-    api_md_script:
-        - '/usr/local/bin/entrypoint.sh varlink_api_generate |& ${TIMESTAMP}'
-        - 'cd ${GOSRC} && ./hack/tree_status.sh |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
 
 build_each_commit_task:
@@ -250,21 +133,8 @@ build_each_commit_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    gce_instance:
-        cpu: 8
-        memory: "8Gb"
-
-    env:
-        MOD_LIBPOD_CONF: 'false'
-
-    timeout_in: 30m
-
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    build_each_commit_script:
-        # set -x by default, no need to spew contents of lib.sh
-        - 'source $SCRIPT_BASE/lib.sh &> /dev/null'
-        - 'git fetch --depth 50 origin $DEST_BRANCH |& ${TIMESTAMP}'
-        - 'make build-all-new-commits GIT_BASE_BRANCH=origin/$DEST_BRANCH |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
 
 build_without_cgo_task:
@@ -279,19 +149,8 @@ build_without_cgo_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    gce_instance:
-        cpu: 8
-        memory: "8Gb"
-
-    env:
-        MOD_LIBPOD_CONF: 'false'
-
-    timeout_in: 30m
-
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    build_without_cgo_script:
-        - 'source $SCRIPT_BASE/lib.sh'
-        - 'make build-no-cgo'
+    # NoOp
+    script: /bin/true
 
 
 # Update metadata on VM images referenced by this repository state
@@ -304,30 +163,8 @@ meta_task:
         - "build_each_commit"
         - "build_without_cgo"
 
-    container:
-        image: "quay.io/libpod/imgts:master"  # see contrib/imgts
-        cpu: 1
-        memory: 1
-
-    env: &meta_env_vars
-        # Space-separated list of images used by this repository state
-        IMGNAMES: >-
-            ${FEDORA_CACHE_IMAGE_NAME}
-            ${PRIOR_FEDORA_CACHE_IMAGE_NAME}
-            ${UBUNTU_CACHE_IMAGE_NAME}
-            ${PRIOR_UBUNTU_CACHE_IMAGE_NAME}
-            ${IMAGE_BUILDER_CACHE_IMAGE_NAME}
-        BUILDID: "${CIRRUS_BUILD_ID}"
-        REPOREF: "${CIRRUS_CHANGE_IN_REPO}"
-        GCPJSON: ENCRYPTED[950d9c64ad78f7b1f0c7e499b42dc058d2b23aa67e38b315e68f557f2aba0bf83068d4734f7b1e1bdd22deabe99629df]
-        # needed for output-masking purposes
-        GCPNAME: ENCRYPTED[b05d469a0dba8cb479cb00cc7c1f6747c91d17622fba260a986b976aa6c817d4077eacffd4613d6d5f23afc4084fab1d]
-        GCPPROJECT: ENCRYPTED[7c80e728e046b1c76147afd156a32c1c57d4a1ac1eab93b7e68e718c61ca8564fc61fef815952b8ae0a64e7034b8fe4f]
-
-    timeout_in: 10m
-
-    # Cirrus-CI ignores entrypoint defined in image
-    script: '$CIRRUS_WORKING_DIR/$SCRIPT_BASE/update_meta.sh |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
 
 # Remove old and disused images based on labels set by meta_task
@@ -341,19 +178,8 @@ image_prune_task:
     depends_on:
         - "meta"
 
-    container:
-        image: "quay.io/libpod/imgprune:master"  # see contrib/imgprune
-        cpu: 1
-        memory: 1
-
-    env:
-        <<: *meta_env_vars
-        GCPJSON: ENCRYPTED[4c11d8e09c904c30fc70eecb95c73dec0ddf19976f9b981a0f80f3f6599e8f990bcef93c253ac0277f200850d98528e7]
-        GCPNAME: ENCRYPTED[7f54557ba6e5a437f11283a53e71baec9ca546f48a9835538cc54d297f79968eb1337d4596a1025b14f9d1c5723fbd29]
-
-    timeout_in: 10m
-
-    script: '/usr/local/bin/entrypoint.sh |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
 
 # This task does the unit and integration testing for every platform
@@ -371,56 +197,17 @@ testing_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    matrix:
-        - name: "test ${FEDORA_NAME}"
-          gce_instance:
-              image_name: "${FEDORA_CACHE_IMAGE_NAME}"
-        - name: "test ${PRIOR_FEDORA_NAME}"
-          gce_instance:
-              image_name: "${PRIOR_FEDORA_CACHE_IMAGE_NAME}"
-        # Multiple test failures on Ubuntu 19 - Fixes TBD in future PR
-        # TODO: image_name: "${UBUNTU_CACHE_IMAGE_NAME}"
-        - name: "test ${PRIOR_UBUNTU_NAME}"
-          gce_instance:
-              image_name: "${PRIOR_UBUNTU_CACHE_IMAGE_NAME}"
-
-    timeout_in: 120m
-
-    env:
-        ADD_SECOND_PARTITION: 'true'
-        matrix:
-            - name: remote
-              env:
-                  TEST_REMOTE_CLIENT: 'true'
-            - name: local
-              env:
-                  TEST_REMOTE_CLIENT: 'false'
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    unit_test_script: '$SCRIPT_BASE/unit_test.sh |& ${TIMESTAMP}'
-    build_release_script: '$SCRIPT_BASE/build_release.sh |& ${TIMESTAMP}'
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} integration_test'
-    system_test_script: '$SCRIPT_BASE/system_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} system_test'
-    apiv2_test_script: '$SCRIPT_BASE/apiv2_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} apiv2_test'
+    # NoOp
+    script: /bin/true
 
     # When examining a particular run, provide convenient access to release files.
     tar_artifacts:
         path: "*.tar.gz"
         type: "application/x-tar"
 
-    always: &standardlogs
-        package_versions_script: '$SCRIPT_BASE/logcollector.sh packages'
-        ginkgo_node_logs_script: '$SCRIPT_BASE/logcollector.sh ginkgo'
-        df_script: '$SCRIPT_BASE/logcollector.sh df'
-        audit_log_script: '$SCRIPT_BASE/logcollector.sh audit'
-        journal_script: '$SCRIPT_BASE/logcollector.sh journal'
-        varlink_script: '$SCRIPT_BASE/logcollector.sh varlink'
-        podman_system_info_script: '$SCRIPT_BASE/logcollector.sh podman'
-
-        html_artifacts:
-            path: "*.log.html"
-            type: "text/html"
+    html_artifacts:
+        path: "*.log.html"
+        type: "text/html"
 
 
 # This task executes tests under unique environments/conditions
@@ -437,27 +224,8 @@ special_testing_rootless_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    env:
-        ADD_SECOND_PARTITION: 'true'
-        SPECIALMODE: 'rootless'  # See docs
-        matrix:
-            - name: remote
-              env:
-                  TEST_REMOTE_CLIENT: 'true'
-            - name: local
-              env:
-                  TEST_REMOTE_CLIENT: 'false'
-
-    timeout_in: 60m
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} integration_test'
-    system_test_script: '$SCRIPT_BASE/system_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} system_test'
-    apiv2_test_script: '$SCRIPT_BASE/apiv2_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} apiv2_test'
-
-    always:
-        <<: *standardlogs
+    # NoOp
+    script: /bin/true
 
 
 special_testing_in_podman_task:
@@ -473,31 +241,8 @@ special_testing_in_podman_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    matrix:
-        # FIXME: Integration testing currently broken for F31 hosts
-        # Error: container_linux.go:345: starting container process caused "process_linux.go:281: applying cgroup configuration for process caused \"mountpoint for cgroup not found\"": OCI runtime error
-        # image_name: "${FEDORA_CACHE_IMAGE_NAME}"
-        - name: "in-podman ${PRIOR_FEDORA_NAME}"
-          gce_instance:
-              image_name: "${PRIOR_FEDORA_CACHE_IMAGE_NAME}"
-
-    env:
-        ADD_SECOND_PARTITION: 'true'
-        MOD_LIBPOD_CONF: 'false'  # Use existing/native setup
-        SPECIALMODE: 'in_podman'  # See docs
-        # TODO: Support both runc and crun (cgroups v1 and v2 container images)
-        # matrix:
-        #   IN_PODMAN_IMAGE: "quay.io/libpod/in_podman:latest"
-        #   IN_PODMAN_IMAGE: "quay.io/libpod/in_podman_cgv2:latest"
-
-    timeout_in: 60m
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} integration_test'
-
-    always:
-        <<: *standardlogs
+    # NoOp
+    script: /bin/true
 
 
 # TODO: Replace this with tasks that use actual Windows & MacOS systems
@@ -514,19 +259,8 @@ special_testing_cross_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    matrix:
-        - name: 'cross-platform: windows'
-          env:
-              CROSS_PLATFORM: 'windows'
-        - name: 'cross-platform: darwin'
-          env:
-              CROSS_PLATFORM: 'darwin'
-
-    timeout_in: 20m
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    build_release_script: '$SCRIPT_BASE/build_release.sh |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
     # When examining a particular run, provide convenient access to release files.
     zip_artifacts:
@@ -549,16 +283,8 @@ special_testing_bindings_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    env:
-        SPECIALMODE: 'bindings'  # See docs
-
-    timeout_in: 40m
-
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} integration_test'
-
-    always:
-        <<: *standardlogs
+    # NoOp
+    script: /bin/true
 
 
 special_testing_endpoint_task:
@@ -572,16 +298,8 @@ special_testing_endpoint_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
-    env:
-        SPECIALMODE: 'endpoint'  # See docs
-
-    timeout_in: 20m
-
-    setup_environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP} | ${LOGFORMAT} integration_test'
-
-    always:
-        <<: *standardlogs
+    # NoOp
+    script: /bin/true
 
 
 # Test building of new cache-images for future PR testing, in this PR.
@@ -598,19 +316,8 @@ test_build_cache_images_task:
     # VMs created by packer are not cleaned up by cirrus, must allow task to complete
     auto_cancellation: $CI != "true"
 
-    gce_instance:
-        image_project: "libpod-218412"
-        zone: "us-central1-a"
-        cpu: 4
-        memory: "4Gb"
-        disk: 200
-        image_name: "${IMAGE_BUILDER_CACHE_IMAGE_NAME}"
-        scopes:  # required for image building
-            - compute
-            - devstorage.full_control
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    build_vm_images_script: '$SCRIPT_BASE/build_vm_images.sh |& ${TIMESTAMP}'
+    # NoOp
+    script: /bin/true
 
     on_failure:
         failed_df_script: '${DFCMD}'
@@ -630,83 +337,8 @@ verify_test_built_images_task:
         - "gating"
         - "test_build_cache_images"
 
-    gce_instance:
-        # Images generated by test_build_cache_images_task (above)
-        image_name: "${PACKER_BUILDER_NAME}${BUILT_IMAGE_SUFFIX}"
-
-    env:
-        ADD_SECOND_PARTITION: 'true'
-        matrix:
-            - name: remote
-              env:
-                  TEST_REMOTE_CLIENT: 'true'
-            - name: local
-              env:
-                  TEST_REMOTE_CLIENT: 'false'
-        matrix:
-            # Required env. var. by check_image_script
-            PACKER_BUILDER_NAME: "${FEDORA_NAME}"
-            PACKER_BUILDER_NAME: "${PRIOR_FEDORA_NAME}"
-            PACKER_BUILDER_NAME: "${PRIOR_UBUNTU_NAME}"
-            # Multiple test failures on ${UBUNTU_CACHE_IMAGE_NAME}
-            # PACKER_BUILDER_NAME: "${UBUNTU_NAME}"
-
-    networking_script: '${CIRRUS_WORKING_DIR}/${SCRIPT_BASE}/networking.sh'
-    installed_packages_script: '$SCRIPT_BASE/logcollector.sh packages'
-    environment_script: '$SCRIPT_BASE/setup_environment.sh |& ${TIMESTAMP}'
-    # Verify expectations once per image
-    check_image_script: >-
-        [[ "$TEST_REMOTE_CLIENT" == "false" ]] || \
-            $SCRIPT_BASE/check_image.sh |& ${TIMESTAMP}
-    # Note: A truncated form of normal testing. It only needs to confirm new images
-    # "probably" work.  A full round of testing will happen again after $*_CACHE_IMAGE_NAME
-    # are updated in this or another PR (w/o '***CIRRUS: TEST IMAGES***').
-    integration_test_script: '$SCRIPT_BASE/integration_test.sh |& ${TIMESTAMP}'
-    system_test_script: '$SCRIPT_BASE/system_test.sh |& ${TIMESTAMP}'
-
-    always:
-        <<: *standardlogs
-
-
-#test_building_snap_task:
-#
-#    depends_on:
-#        - "gating"
-#
-#    only_if: >-
-#        $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
-#        $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
-#
-#    container:
-#        image: yakshaveinc/snapcraft:core18
-#    snapcraft_script:
-#        - 'apt-get -y update'
-#        - 'cd contrib/snapcraft && snapcraft'
-#
-#
-#upload_snap_task:
-#    only_if: >-
-#        $CIRRUS_BRANCH != $DEST_BRANCH &&
-#        $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:IMG.*' &&
-#        $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
-#
-#    # Only when PR or branch is merged into master
-#
-#    depends_on:
-#        - "test_building_snap"
-#
-#    container:
-#        image: yakshaveinc/snapcraft:core18
-#
-#    env:
-#        SNAPCRAFT_LOGIN: ENCRYPTED[d8e82eb31c6372fec07f405f413d57806026b1a9f8400033531ebcd54d6750a5e4a8b1f68e3ec65c98c65e0d9b2a6a75]
-#    snapcraft_login_file:
-#        path: /root/.snapcraft/login.cfg
-#        variable_name: SNAPCRAFT_LOGIN
-#    snapcraft_script:
-#        - 'apt-get -y update'
-#        - 'snapcraft login --with "/root/.snapcraft/login.cfg"'
-#        - 'cd contrib/snapcraft && snapcraft && snapcraft push *.snap --release edge'
+    # NoOp
+    script: /bin/true
 
 
 docs_task:
@@ -717,8 +349,8 @@ docs_task:
     depends_on:
         - "gating"
 
-    script:
-        - "$SCRIPT_BASE/build_swagger.sh |& ${TIMESTAMP}"
+    # NoOp
+    script: /bin/true
 
     yaml_artifacts:
         path: "pkg/api/swagger.yaml"
