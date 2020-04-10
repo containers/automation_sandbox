@@ -299,7 +299,7 @@ special_testing_endpoint_task:
         $CIRRUS_CHANGE_MESSAGE !=~ '.*CI:DOCS.*'
 
     # NoOp
-    script: /bin/true
+    script: /bin/false
 
 
 # Test building of new cache-images for future PR testing, in this PR.
