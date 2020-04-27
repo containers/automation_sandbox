@@ -45,11 +45,14 @@ jobs:
                 cirrus_app_id=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
                 [[ "$cirrus_app_id" == "3232" ]]
 
-                repo_node_id=
-                head_sha=
+                _filt='.repository.node_id'
+                repo_node_id=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
+                _filt='.check_suite.app.head_sha'
+                head_sha=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
 
                 # Obtain all check_runs and their important details
                 curl --request POST \
+                  --silent \
                   --url https://api.github.com/graphql \
                   --header 'accept: application/vnd.github.antiope-preview+json' \
                   --header 'authorization: Bearer ${{ github.token }}' \
@@ -82,6 +85,6 @@ jobs:
                       }
                   }",
                   "variables":{"repo_node_id":"'$repo_node_id'","head_sha":"'$head_sha'"}}' \
-                                      > ./all_check_runs.json
+                                      | tee ./all_check_runs.json | jq --indent 4 --color-output .
 
                   jq --indent 4 --color-output . ./all_check_runs.json
