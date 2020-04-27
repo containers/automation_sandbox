@@ -1,2 +1,0 @@
-FROM busybox:latest
-ADD alpinetest.tgz /data
