@@ -55,33 +55,33 @@ jobs:
                   --header 'authorization: Bearer ${{ github.token }}' \
                   --header 'content-type: application/json' \
                   --data '
-{"query":"query ($repo_node_id: ID!, $head_sha: GitObjectID!) {
-    node(id: $repo_node_id) {
-        ... on Repository {
-            object(oid: $head_sha) {
-                ... on Commit {
-                    checkSuites(first: 1, filterBy: {appId: 3232}) {
-                        nodes {
-                            checkRuns(last: 100) {
-                                nodes {
-                                    name
-                                    externalId
-                                    conclusion
-                                    status
-                                    summary
-                                    id
-                                    startedAt
-                                    completedAt
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}",
-"variables":{"repo_node_id":"'$repo_node_id'","head_sha":"'$head_sha'"}}' \
-                  > ./all_check_runs.json
+                  {"query":"query ($repo_node_id: ID!, $head_sha: GitObjectID!) {
+                      node(id: $repo_node_id) {
+                          ... on Repository {
+                              object(oid: $head_sha) {
+                                  ... on Commit {
+                                      checkSuites(first: 1, filterBy: {appId: 3232}) {
+                                          nodes {
+                                              checkRuns(last: 100) {
+                                                  nodes {
+                                                      name
+                                                      externalId
+                                                      conclusion
+                                                      status
+                                                      summary
+                                                      id
+                                                      startedAt
+                                                      completedAt
+                                                  }
+                                              }
+                                          }
+                                      }
+                                  }
+                              }
+                          }
+                      }
+                  }",
+                  "variables":{"repo_node_id":"'$repo_node_id'","head_sha":"'$head_sha'"}}' \
+                                      > ./all_check_runs.json
 
                   jq --indent 4 --color-output . ./all_check_runs.json
