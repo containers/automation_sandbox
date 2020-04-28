@@ -18,13 +18,13 @@ container:
 cirrus-ci/test_pass_task:
     script:
         - echo "Doing some busy-work"
-        - sleep 3m
+        - sleep 1m
 
 # Task that always fails
 cirrus-ci/test_fail_task:
     script:
         - echo "Doing some busy-work"
-        - sleep 2m
+        - sleep 1m
         - echo "Failing"
         - /bin/false
 
@@ -51,7 +51,7 @@ cirrus-ci/test_manual_task:
     trigger_type: manual
     script:
         - echo "Doing some busy-work"
-        - sleep 2m
+        - sleep 1m
 
 # Represent overall status
 cirrus-ci/success_task:
