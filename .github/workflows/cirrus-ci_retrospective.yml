@@ -34,7 +34,6 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - run: |
-                set -x
 
                 jq --exit-status 'has("check_suite")' < "$GITHUB_EVENT_PATH"
 
@@ -47,8 +46,11 @@ jobs:
 
                 _filt='.repository.node_id'
                 repo_node_id=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
-                _filt='.check_suite.app.head_sha'
+                _filt='.check_suite.head_sha'
                 head_sha=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
+
+                [[ -n "$repo_node_id" ]] && [[ -n "$head_sha" ]] && \
+                [[ "$repo_node_id" != "null" ]] && [[ "$head_sha" != "null" ]]
 
                 # Obtain all check_runs and their important details
                 curl --request POST \
@@ -86,5 +88,3 @@ jobs:
                   }",
                   "variables":{"repo_node_id":"'$repo_node_id'","head_sha":"'$head_sha'"}}' \
                                       | tee ./all_check_runs.json | jq --indent 4 --color-output .
-
-                  jq --indent 4 --color-output . ./all_check_runs.json
