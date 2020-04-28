@@ -34,6 +34,7 @@ jobs:
         runs-on: ubuntu-latest
         steps:
             - run: |
+                set -e
                 [[ $(jq --exit-status 'has("check_suite")' < "$GITHUB_EVENT_PATH") == "true" ]]
 
                 _act_typ=$(jq --compact-output --raw-output '.action' < "$GITHUB_EVENT_PATH")
@@ -51,7 +52,22 @@ jobs:
                 [[ -n "$repo_node_id" ]] && [[ -n "$head_sha" ]] && \
                 [[ "$repo_node_id" != "null" ]] && [[ "$head_sha" != "null" ]]
 
-                set -x
+                Q=$(curl --location --url 'https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw/check_runs_by_sha.graphql')
+                V=$(curl --location --url 'https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw/variables.json' | \
+                    sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
+                    sed -r -e "s/@@head_sha@@/$head_sha/g")
+
+                BASE_URL='https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
+                # Encode query into file to avoid shell interaction and quoting complexity
+                echo -n '{"query":"' > ./data
+                # Obtain actual query and varibles from gists, so they can be easily modified/updated
+                curl --location --url "$BASE_URL/check_runs_by_sha.graphql" >> ./data
+                echo -n '", "variables": "' >> ./data
+                curl --location --url "$BASE_URL/variables.json" | \
+                    sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
+                    sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./data
+                echo '"}' >> ./data
+
                 # Obtain all check_runs and their important details
                 curl --request POST \
                   --silent \
@@ -59,34 +75,16 @@ jobs:
                   --header 'accept: application/vnd.github.antiope-preview+json' \
                   --header 'authorization: Bearer ${{ github.token }}' \
                   --header 'content-type: application/json' \
-                  --data '
-                  {"query":"query ($repo_node_id: ID!, $head_sha: GitObjectID!) {
-                      node(id: $repo_node_id) {
-                          ... on Repository {
-                              object(oid: $head_sha) {
-                                  ... on Commit {
-                                      checkSuites(first: 1, filterBy: {appId: 3232}) {
-                                          nodes {
-                                              checkRuns(last: 100) {
-                                                  nodes {
-                                                      name
-                                                      externalId
-                                                      conclusion
-                                                      status
-                                                      summary
-                                                      id
-                                                      startedAt
-                                                      completedAt
-                                                  }
-                                              }
-                                          }
-                                      }
-                                  }
-                              }
-                          }
-                      }
-                  }",
-                  "variables":{"repo_node_id":"'$repo_node_id'","head_sha":"'$head_sha'"}}' | \
-                                      tee ./curl_output
+                  --data @./data
 
                   jq --indent 4 --color-output . < ./curl_output
+            - if: always()
+              uses: actions/upload-artifact@v1
+              with:
+                name: GithubQuery
+                path: data
+            - if: always()
+              uses: actions/upload-artifact@v1
+              with:
+                name: GithubResult
+                path: curl_output
