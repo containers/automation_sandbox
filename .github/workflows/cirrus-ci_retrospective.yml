@@ -56,18 +56,19 @@ jobs:
                 mkdir -p artifacts
 
                 # Encode query into file to avoid shell interaction and quoting complexity
-                BASE_URL='https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
+                BASE_URL='https://gist.githubusercontent.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
                 echo -n '{"query":"' > ./artifacts/query.json
                 curl --silent --location --url "$BASE_URL/check_runs_by_sha.graphql" >> ./artifacts/query.json
-                echo -n '", "variables": "' >> ./artifacts/query.json
-                curl -silent --location --url "$BASE_URL/variables.json" | \
+                echo -n '", "variables": ' >> ./artifacts/query.json
+                curl --silent --location --url "$BASE_URL/variables.json" | \
                     sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
                     sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./artifacts/query.json
-                echo '"}' >> ./artifacts/query.json
+                echo '}' >> ./artifacts/query.json
 
                 # Obtain all check_runs and their important details
                 curl --request POST \
                   --silent \
+                  --location \
                   --url https://api.github.com/graphql \
                   --header 'accept: application/vnd.github.antiope-preview+json' \
                   --header 'authorization: Bearer ${{ github.token }}' \
