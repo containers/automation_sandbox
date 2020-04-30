@@ -63,7 +63,7 @@ jobs:
                 curl --silent --location --url "$BASE_URL/variables.json" | \
                     sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
                     sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./artifacts/query_raw.json
-                echo '}' > ./artifacts/query_raw.json
+                echo '}' >> ./artifacts/query_raw.json
                 tr -d '[:space:]' < ./artifacts/query_raw.json > ./artifacts/query.json
 
                 # Obtain all check_runs and their important details
