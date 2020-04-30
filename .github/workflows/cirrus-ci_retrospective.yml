@@ -6,6 +6,7 @@ on:
             - completed
 
 env:
+    ACTIONS_SCRIPTS_URL: 'https://raw.githubusercontent.com/${{ github.repository }}/master/.github/actions'
     ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
 
 jobs:
@@ -33,50 +34,7 @@ jobs:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
-            - run: |
-                set -e
-                [[ $(jq --exit-status 'has("check_suite")' < "$GITHUB_EVENT_PATH") == "true" ]]
-
-                _act_typ=$(jq --compact-output --raw-output '.action' < "$GITHUB_EVENT_PATH")
-                [[ "$_act_typ" == "completed" ]]
-
-                _filt='.check_suite.app.id'
-                cirrus_app_id=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
-                [[ "$cirrus_app_id" == "3232" ]]
-
-                _filt='.repository.node_id'
-                repo_node_id=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
-                _filt='.check_suite.head_sha'
-                head_sha=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
-
-                [[ -n "$repo_node_id" ]] && [[ -n "$head_sha" ]] && \
-                [[ "$repo_node_id" != "null" ]] && [[ "$head_sha" != "null" ]]
-
-                # Makes uploading artifacts easier
-                mkdir -p artifacts
-
-                # Encode query into file to avoid shell interaction and quoting complexity
-                BASE_URL='https://gist.githubusercontent.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
-                echo -n '{"query":"' > ./artifacts/query_raw.json
-                curl --silent --location --url "$BASE_URL/check_runs_by_sha.graphql" >> ./artifacts/query_raw.json
-                echo -n '", "variables": ' >> ./artifacts/query_raw.json
-                curl --silent --location --url "$BASE_URL/variables.json" | \
-                    sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
-                    sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./artifacts/query_raw.json
-                echo '}' >> ./artifacts/query_raw.json
-                tr -d '[:space:]' < ./artifacts/query_raw.json > ./artifacts/query.json
-
-                # Obtain all check_runs and their important details
-                curl --request POST \
-                  --silent \
-                  --location \
-                  --url https://api.github.com/graphql \
-                  --header 'accept: application/vnd.github.antiope-preview+json' \
-                  --header 'authorization: Bearer ${{ github.token }}' \
-                  --header 'content-type: application/json' \
-                  --data @./artifacts/query.json -o ./artifacts/reply.json
-
-                  jq --indent 4 --color-output . <./artifacts/reply.json
+            - run: curl --silent --location --url '${{ env.ACTIONS_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -89,4 +47,4 @@ jobs:
             - uses: actions/download-artifact@v2
               with:
                   name: query_and_reply
-            - run: ls -laR
+            - run: curl --silent --location --url '${{ env.ACTIONS_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
