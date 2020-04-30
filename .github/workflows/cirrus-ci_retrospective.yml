@@ -29,7 +29,7 @@ jobs:
             - if: always()
               name: Log colorized and formatted cirrus-ci_retrospective JSON
               run: jq --indent 4 --color-output . ./cirrus-ci_retrospective.json
-    shell:
+    github:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
@@ -78,7 +78,15 @@ jobs:
 
                   jq --indent 4 --color-output . <./artifacts/reply.json
             - if: always()
-              uses: actions/upload-artifact@v1
+              uses: actions/upload-artifact@v2
               with:
-                name: artifacts
-                path: artifacts
+                name: query_and_reply
+                path: artifacts/*.json
+    cirrus-ci:
+        needs: github
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/download-artifact@v2
+              with:
+                  name: query_and_reply
+            - run: ls -laR
