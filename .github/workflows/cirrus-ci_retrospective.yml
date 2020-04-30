@@ -52,21 +52,18 @@ jobs:
                 [[ -n "$repo_node_id" ]] && [[ -n "$head_sha" ]] && \
                 [[ "$repo_node_id" != "null" ]] && [[ "$head_sha" != "null" ]]
 
-                Q=$(curl --location --url 'https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw/check_runs_by_sha.graphql')
-                V=$(curl --location --url 'https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw/variables.json' | \
-                    sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
-                    sed -r -e "s/@@head_sha@@/$head_sha/g")
+                # Makes uploading artifacts easier
+                mkdir -p artifacts
 
-                BASE_URL='https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
                 # Encode query into file to avoid shell interaction and quoting complexity
-                echo -n '{"query":"' > ./data
-                # Obtain actual query and varibles from gists, so they can be easily modified/updated
-                curl --location --url "$BASE_URL/check_runs_by_sha.graphql" >> ./data
-                echo -n '", "variables": "' >> ./data
-                curl --location --url "$BASE_URL/variables.json" | \
+                BASE_URL='https://gist.github.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
+                echo -n '{"query":"' > ./artifacts/query.json
+                curl --silent --location --url "$BASE_URL/check_runs_by_sha.graphql" >> ./artifacts/query.json
+                echo -n '", "variables": "' >> ./artifacts/query.json
+                curl -silent --location --url "$BASE_URL/variables.json" | \
                     sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
-                    sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./data
-                echo '"}' >> ./data
+                    sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./artifacts/query.json
+                echo '"}' >> ./artifacts/query.json
 
                 # Obtain all check_runs and their important details
                 curl --request POST \
@@ -75,16 +72,11 @@ jobs:
                   --header 'accept: application/vnd.github.antiope-preview+json' \
                   --header 'authorization: Bearer ${{ github.token }}' \
                   --header 'content-type: application/json' \
-                  --data @./data
+                  --data @./artifacts/query.json -o ./artifacts/reply.json
 
-                  jq --indent 4 --color-output . < ./curl_output
+                  jq --indent 4 --color-output . <./artifacts/reply.json
             - if: always()
               uses: actions/upload-artifact@v1
               with:
-                name: GithubQuery
-                path: data
-            - if: always()
-              uses: actions/upload-artifact@v1
-              with:
-                name: GithubResult
-                path: curl_output
+                name: artifacts
+                path: artifacts
