@@ -19,8 +19,8 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              # Avoid needing to embed scripts into this YAML; 'set -ex' automaticly added by github
-              run: curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
+              # Avoid needing to embed scripts into this YAML
+              run: set -ex; curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -36,4 +36,4 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              run: curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
+              run: set -ex; curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' | bash -s
