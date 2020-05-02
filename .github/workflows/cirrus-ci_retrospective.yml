@@ -27,7 +27,7 @@ jobs:
             - if: always()
               uses: actions/upload-artifact@v2
               with:
-                  name: query_and_reply
+                  name: ${{ github.job }}_artifacts
                   path: artifacts/*.json
     cirrus-ci:
         needs: github
@@ -35,7 +35,7 @@ jobs:
         steps:
             - uses: actions/download-artifact@v2
               with:
-                  name: query_and_reply
+                  name: github_artifacts
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
@@ -43,3 +43,8 @@ jobs:
                   GIST_SH=$(mktemp -p '' ${{ github.job }}_XXXX.sh)
                   curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' -o $GIST_SH
                   source $GIST_SH
+            - if: always()
+              uses: actions/upload-artifact@v2
+              with:
+                  name: ${{ github.job }}_artifacts
+                  path: artifacts/*.json
