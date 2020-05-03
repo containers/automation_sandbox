@@ -37,8 +37,6 @@ jobs:
               with:
                   name: github_artifacts
             - shell: bash
-              env:
-                  GITHUB_TOKEN: ${{ github.token }}
               run: |
                   GIST_SH=$(mktemp -p '' ${{ github.job }}_XXXX.sh)
                   curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' -o $GIST_SH
