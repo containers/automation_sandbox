@@ -22,7 +22,8 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              run: ./$(basename $PWD)/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
+              # Assumes checkout of master into ./<repo name>/
+              run: ./$(basename $PWD)/.github/actions/${{ env.GITHUB_WORKFLOW }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -42,7 +43,7 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              run: ./$(basename $PWD)/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
+              run: ./$(basename $PWD)/.github/actions/${{ env.GITHUB_WORKFLOW }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
