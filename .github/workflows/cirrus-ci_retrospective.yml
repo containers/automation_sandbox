@@ -8,22 +8,23 @@ on:
 env:
     # Ref: https://help.github.com/en/actions/configuring-and-managing-workflows/managing-a-workflow-run#enabling-step-debug-logging
     ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
-    # Workflow does not have access to source repository, store dependent scripts as gists instead.
-    GIST_SCRIPTS_URL: 'https://gist.githubusercontent.com/cevich/165f6477745cc2e9ec048f169155fd83/raw'
+    # Path to helper scripts/data, assumes repo checkout in workspace
+    ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
 
 jobs:
     github:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest
         steps:
+            - uses: actions/checkout@v2
+              with:
+                  ref: master  # For clarity - workflow always/only runs from master branch
+                  persist-credentials: false
+                  path: .
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              # Avoid needing to embed scripts into this YAML
-              run: |
-                  GIST_SH=$(mktemp -p '' ${{ github.job }}_XXXX.sh)
-                  curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' -o $GIST_SH
-                  source $GIST_SH
+              run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -33,16 +34,20 @@ jobs:
         needs: github
         runs-on: ubuntu-latest
         steps:
+            - uses: actions/checkout@v2
+              with:
+                  persist-credentials: false
+                  path: .
             - uses: actions/download-artifact@v2
               with:
                   name: github_artifacts
             - shell: bash
-              run: |
-                  GIST_SH=$(mktemp -p '' ${{ github.job }}_XXXX.sh)
-                  curl --silent --location --url '${{ env.GIST_SCRIPTS_URL }}/${{ github.job }}.sh' -o $GIST_SH
-                  source $GIST_SH
+              env:
+                  GITHUB_TOKEN: ${{ github.token }}
+              run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
+                  ref: master
                   name: ${{ github.job }}_artifacts
                   path: artifacts/*.json
