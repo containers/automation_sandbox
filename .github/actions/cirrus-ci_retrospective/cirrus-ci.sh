@@ -14,8 +14,6 @@ _filt='.data.node.object.checkSuites.nodes[].checkRuns.nodes[].externalId'
 # Verify reply JSON is valid, and extract the task IDs as a newline separated list
 task_ids=$(jq --compact-output --raw-output $_filt < ./reply.json)
 
-# Encode query into a file to avoid shell interaction and quoting complexity
-curl --silent --location --url "$GIST_SCRIPTS_URL/build_task_by_id.tmpl" --remote-name
 (
     # Start of raw/unprocessed JSON
     echo -n '{"query":"'
@@ -23,7 +21,7 @@ curl --silent --location --url "$GIST_SCRIPTS_URL/build_task_by_id.tmpl" --remot
     echo 'query {'
     for task_id in $task_ids; do
         echo "Formatting query for $task_id from template" > /dev/stderr
-        sed -r -e "s/@@task_id@@/$task_id/g" ./build_task_by_id.tmpl
+        sed -r -e "s/@@task_id@@/$task_id/g" $(dirpath $0)/build_task_by_id.tmpl
     done
     # End of query string
     echo '}"'

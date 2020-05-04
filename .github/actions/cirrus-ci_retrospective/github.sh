@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -exo pipefail
+set -eo pipefail
 
 # Intended to be executed from a github action workflow step
 
@@ -36,10 +36,9 @@ head_sha=$(jq --compact-output --raw-output "$_filt" < "$GITHUB_EVENT_PATH")
 
 # Encode query into a file to avoid shell interaction and quoting complexity
 echo -n '{"query":"' > ./artifacts/query_raw.json
-curl --silent --location --url "$GIST_SCRIPTS_URL/check_runs_by_sha.graphql" >> ./artifacts/query_raw.json
+cat $(dirname $0)/check_runs_by_sha.graphql >> ./artifacts/query_raw.json
 echo -n '", "variables": ' >> ./artifacts/query_raw.json
-curl --silent --location --url "$GIST_SCRIPTS_URL/check_runs_by_sha.variables" | \
-    sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" | \
+sed -r -e "s/@@repo_node_id@@/$repo_node_id/g" $(dirname $0)/check_runs_by_sha.variables | \
     sed -r -e "s/@@head_sha@@/$head_sha/g" >> ./artifacts/query_raw.json
 echo '}' >> ./artifacts/query_raw.json
 echo "Formatting query JSON for submission"
