@@ -21,12 +21,11 @@ jobs:
               with:
                   ref: master  # For clarity - workflow always/only runs from master branch
                   persist-credentials: false
-                  path: .
+                  path: ${{ github.repository }}
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              # Assumes checkout of master into ./<repo name>/
-              run: ./$(basename $PWD)/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
+              run: ./${{ github.repository }}/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -46,7 +45,7 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-              run: ./$(basename $PWD)/.github/actions/${{ env.GITHUB_WORKFLOW }}/${{ github.job }}.sh
+              run: ./${{ github.repository }}/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
