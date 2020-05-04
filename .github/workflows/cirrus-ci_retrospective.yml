@@ -8,8 +8,6 @@ on:
 env:
     # Ref: https://help.github.com/en/actions/configuring-and-managing-workflows/managing-a-workflow-run#enabling-step-debug-logging
     ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
-    # Path to helper scripts/data, assumes repo checkout in workspace
-    ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
 
 jobs:
     github:
@@ -24,6 +22,8 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
+                  # Can't reference GITHUB_WORKFLOW from top-level env block (above)
+                  ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
               run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
@@ -44,6 +44,7 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
+                  ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
               run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
