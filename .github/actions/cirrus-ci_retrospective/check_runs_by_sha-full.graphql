@@ -1,3 +1,5 @@
+# Not used: For reference only
+
 query ($repo_node_id: ID!, $head_sha: GitObjectID!) {
     node(id: $repo_node_id) {
         ... on Repository {
@@ -11,6 +13,7 @@ query ($repo_node_id: ID!, $head_sha: GitObjectID!) {
                                     externalId
                                     conclusion
                                     status
+                                    summary
                                     id
                                     startedAt
                                     completedAt
