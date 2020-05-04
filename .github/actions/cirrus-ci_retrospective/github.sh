@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -eo pipefail
+set -exo pipefail
 
 # Intended to be executed from a github action workflow step
 
