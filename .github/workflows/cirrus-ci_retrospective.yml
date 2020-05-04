@@ -22,9 +22,7 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-                  # Can't reference GITHUB_WORKFLOW from top-level env block (above)
-                  ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
-              run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
+              run: ./$(basename $PWD)/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
@@ -44,8 +42,7 @@ jobs:
             - shell: bash
               env:
                   GITHUB_TOKEN: ${{ github.token }}
-                  ACTION_SCRIPTS_DIRPATH: ./.github/actions/${{ env.GITHUB_WORKFLOW }}
-              run: $ACTION_SCRIPTS_DIRPATH/${{ github.job }}.sh
+              run: ./$(basename $PWD)/.github/actions/${{ github.workflow }}/${{ github.job }}.sh
             - if: always()
               uses: actions/upload-artifact@v2
               with:
