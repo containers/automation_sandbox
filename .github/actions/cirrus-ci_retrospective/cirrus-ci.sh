@@ -21,7 +21,7 @@ task_ids=$(jq --compact-output --raw-output $_filt < ./reply.json)
     echo 'query {'
     for task_id in $task_ids; do
         echo "Formatting query for $task_id from template" > /dev/stderr
-        sed -r -e "s/@@task_id@@/$task_id/g" $(dirpath $0)/build_task_by_id.tmpl
+        sed -r -e "s/@@task_id@@/$task_id/g" $(dirname $0)/build_task_by_id.tmpl
     done
     # End of query string
     echo '}"'
