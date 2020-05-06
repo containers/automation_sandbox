@@ -17,14 +17,20 @@ container:
 # CI-Testing (itself) task that always passes + uploads simple artifact
 cirrus-ci/test_pass_task:
     script:
-        - echo "Doing some busy-work"
-        - sleep 1m
+        - sleep 1m  # busy work
+        - |
+            echo "Environment Variables:"
+            for _env_var_name in $(awk 'BEGIN{for(v in ENVIRON) print v}' | \
+                                   egrep -v "(^BASH_FUNC)|(^[[:punct:][:space:]]+)" | \
+                                   sort -u); do
+                printf "    ${_env_var_name}=%q\n" "$(printenv $_env_var_name)";
+            done
+
 
 # Task that always fails
 cirrus-ci/test_fail_task:
     script:
-        - echo "Doing some busy-work"
-        - sleep 1m
+        - sleep 1m  # busy work
         - echo "Failing"
         - /bin/false
 
@@ -32,8 +38,7 @@ cirrus-ci/test_fail_task:
 cirrus-ci/test_ignore_task:
     allow_failures: $CI == 'true'
     script:
-        - echo "Doing some busy-work"
-        - sleep 1m
+        - sleep 1m  # busy work
         - echo "Failing"
         - /bin/false
 
@@ -41,8 +46,7 @@ cirrus-ci/test_ignore_task:
 cirrus-ci/test_skip_task:
     skip: $CI == 'true'
     script:
-        - echo "Doing some busy-work"
-        - sleep 1m
+        - sleep 1m  # busy work
         - echo "Failing"
         - /bin/false
 
@@ -50,8 +54,7 @@ cirrus-ci/test_skip_task:
 cirrus-ci/test_manual_task:
     trigger_type: manual
     script:
-        - echo "Doing some busy-work"
-        - sleep 1m
+        - sleep 1m  # busy work
 
 # Represent overall status
 cirrus-ci/success_task:
@@ -60,4 +63,10 @@ cirrus-ci/success_task:
         - cirrus-ci/test_ignore
         - cirrus-ci/test_skip
     script:
-        - /bin/true
+        - |
+            echo "Environment Variables:"
+            for _env_var_name in $(awk 'BEGIN{for(v in ENVIRON) print v}' | \
+                                   egrep -v "(^BASH_FUNC)|(^[[:punct:][:space:]]+)" | \
+                                   sort -u); do
+                printf "    ${_env_var_name}=%q\n" "$(printenv $_env_var_name)";
+            done
