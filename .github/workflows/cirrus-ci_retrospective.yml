@@ -13,6 +13,11 @@ env:
     ACTIONS_STEP_DEBUG: '${{ secrets.ACTIONS_STEP_DEBUG }}'
 
 jobs:
+    event-debug:
+        runs-on: ubuntu-latest
+        steps:
+            - shell: bash
+              run: jq --color-output --indent 4 . "${{ github.event_path }}"
     github:
         if: github.event.check_suite.app.name == 'Cirrus CI'
         runs-on: ubuntu-latest

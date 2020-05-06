@@ -1,16 +1,20 @@
   task_@@task_id@@: task(id: @@task_id@@) {
-    build {
-      id
-      changeIdInRepo
-      durationInSeconds
-      changeTimestamp
-      buildCreatedTimestamp
-      status
-    }
+    automaticReRun
+    durationInSeconds
     name
     status
     statusTimestamp
-    durationInSeconds
+    triggerType
+    build {
+      branch
+      buildCreatedTimestamp
+      changeIdInRepo
+      changeTimestamp
+      durationInSeconds
+      id
+      pullRequest
+      status
+    }
     statusDurations {
       status
       durationInSeconds
@@ -23,6 +27,4 @@
       name
       status
     }
-    automaticReRun
-    triggerType
   }
