@@ -2,71 +2,17 @@
 
 # Main collection of env. vars to set for all tasks and scripts.
 env:
-    ####
-    #### Global variables used for all tasks
-    ####
-    # Name of the ultimate destination branch for this CI run, PR or post-merge.
-    DEST_BRANCH: "master"
-    CIRRUS_CLONE_DEPTH: 1
-
-container:
-    cpu: 1
-    memory: 1
-    image: fedora:latest
-
-# CI-Testing (itself) task that always passes + uploads simple artifact
-cirrus-ci/test_pass_task:
-    script:
-        - sleep 1m  # busy work
-        - |
-            echo "Environment Variables:"
-            for _env_var_name in $(awk 'BEGIN{for(v in ENVIRON) print v}' | \
-                                   egrep -v "(^BASH_FUNC)|(^[[:punct:][:space:]]+)" | \
-                                   sort -u); do
-                printf "    ${_env_var_name}=%q\n" "$(printenv $_env_var_name)";
-            done
+    IMAGE_SUFFIX: "c6323493627232256"
+    FEDORA_CONTAINER_FQIN: "quay.io/libpod/fedora_podman:${IMAGE_SUFFIX}"
 
 
-# Task that always fails
-cirrus-ci/test_fail_task:
-    script:
-        - sleep 1m  # busy work
-        - echo "Failing"
-        - /bin/false
+# Default timeout for each task
+timeout_in: 10m
 
-# Task that always fails but status is ignored
-cirrus-ci/test_ignore_task:
-    allow_failures: $CI == 'true'
-    script:
-        - sleep 1m  # busy work
-        - echo "Failing"
-        - /bin/false
 
-# Task that always fails but never runs
-cirrus-ci/test_skip_task:
-    skip: $CI == 'true'
-    script:
-        - sleep 1m  # busy work
-        - echo "Failing"
-        - /bin/false
-
-# Task that always passes when run manually
-cirrus-ci/test_manual_task:
-    trigger_type: manual
-    script:
-        - sleep 1m  # busy work
-
-# Represent overall status
-cirrus-ci/success_task:
-    depends_on:
-        - cirrus-ci/test_pass
-        - cirrus-ci/test_ignore
-        - cirrus-ci/test_skip
-    script:
-        - |
-            echo "Environment Variables:"
-            for _env_var_name in $(awk 'BEGIN{for(v in ENVIRON) print v}' | \
-                                   egrep -v "(^BASH_FUNC)|(^[[:punct:][:space:]]+)" | \
-                                   sort -u); do
-                printf "    ${_env_var_name}=%q\n" "$(printenv $_env_var_name)";
-            done
+failing_test_task:
+    container:
+        image: ${FEDORA_CONTAINER_FQIN}
+        cpu: 2
+        memory: 2
+    script: /bin/false
