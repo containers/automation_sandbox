@@ -11,8 +11,17 @@ timeout_in: 10m
 
 
 failing_test_task:
+    only_if: $CIRRUS_CRON != ''
     container:
         image: ${FEDORA_CONTAINER_FQIN}
         cpu: 2
         memory: 2
     script: /bin/false
+
+
+passing_test_task:
+    container:
+        image: ${FEDORA_CONTAINER_FQIN}
+        cpu: 2
+        memory: 2
+    script: /bin/true
