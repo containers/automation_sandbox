@@ -1,0 +1,14 @@
+---
+
+container: &container
+    image: quay.io/libpod/alpine:latest
+
+test_task:
+    script: sleep 10s
+
+success_task:
+    depends_on:
+        - test
+    container: *container
+    clone_script: mkdir -p "${CIRRUS_WORKING_DIR}"
+    script: true
