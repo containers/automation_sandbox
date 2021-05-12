@@ -1,0 +1,17 @@
+#!/bin/bash
+
+set -e
+
+rd() { echo $((RANDOM%100)); }
+
+if [[ "$@" =~ version ]]; then
+    cat <<EOF
+Automation Images Test Script: $@
+VeRsIoN: 	 	 	 	 	 	$(rd).$(rd).$(rd)  # completely random
+garbage data: ignore me
+EOF
+    exit 0
+else
+    echo "ERROR: Expecting 'version' parameter"
+    exit 1
+fi
