@@ -1,0 +1,37 @@
+---
+
+name: debug_event
+
+on:
+    pull_request:
+        branches:
+            - main
+    # Allow triggering manually (N/B: event.json will be different
+    # than when triggered otherwise)
+    workflow_dispatch: {}
+
+jobs:
+    debug_event:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  persist-credentials: false
+            - name: Debug environment variables
+              shell: bash
+              run: printenv
+            - name: Debug event JSON
+              shell: bash
+              run: jq --color-output . ${{ github.event_path }}
+    provide_help:
+        runs-on: ubuntu-latest
+        steps:
+            # Only execute if the PR has the 'help wanted' label
+            - name: Conditional Help
+              if: "contains(github.event.pull_request.labels.*.name, 'help wanted')"
+              shell: bash
+              run: 'echo "Help wanted label detected"'
+            - name: Conditional Hint
+              if: "!contains(github.event.pull_request.labels.*.name, 'help wanted')"
+              shell: bash
+              run: 'echo "Please add help wanted label"'
