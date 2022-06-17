@@ -1,0 +1,105 @@
+---
+
+env:
+    CTR_FQIN: 'quay.io/libpod/alpine:latest'
+
+ext_svc_check_task:
+    alias: 'ext_svc_check'
+    name: "Ext. services"
+    only_if: $CIRRUS_TAG == ''
+    container: &smallcontainer
+        image: ${CTR_FQIN}
+        cpu: 2
+        memory: 2
+    setup_script: &setup 'sleep 3s'
+    main_script: &main 'echo $CTR_FQIN && sleep 7s'
+
+automation_task:
+    alias: 'automation'
+    name: "Check Automation"
+    only_if: &is_pr "$CIRRUS_PR != ''"
+    container: *smallcontainer
+    setup_script: *setup
+    main_script: *main
+
+build_task:
+    alias: 'build'
+    name: 'Build for $CTR_FQIN'
+    only_if: "$CIRRUS_CRON != 'multiarch'"
+    container: *smallcontainer
+    matrix: &platform_axis
+        - env: &stdenvars
+              CTR_FQIN: quay.io/libpod/alpine:3.2
+        - env: &priorfedora_envvars
+              CTR_FQIN: quay.io/libpod/alpine:3.10.2
+        - env: &ubuntu_envvars
+              CTR_FQIN: quay.io/libpod/alpine:withseccomp
+    setup_script: *setup
+    main_script: *main
+
+validate_task:
+    name: "Validate $CTR_FQIN Build"
+    alias: validate
+    only_if: *is_pr
+    depends_on:
+        - ext_svc_check
+        - automation
+        - build
+    container: *smallcontainer
+    setup_script: *setup
+    main_script: *main
+
+unit_test_task:
+    name: "Unit tests on $CTR_FQIN"
+    alias: unit_test
+    only_if: &always $CIRRUS_BUILD_ID != "testing_something"
+    depends_on:
+        - build
+        - validate
+    matrix:
+        - env: *stdenvars
+        - env: *priorfedora_envvars
+        - env: *ubuntu_envvars
+        - name: "Rootless unit on $CTR_FQIN"
+          env: *stdenvars
+    container: *smallcontainer
+    setup_script: *setup
+    main_script: *main
+
+local_integration_test_task: &local_integration_test_task
+    alias: local_integration_test
+    only_if: *always
+    depends_on:
+        - build
+        - unit_test
+    matrix: *platform_axis
+    container: *smallcontainer
+    setup_script: *setup
+    main_script: *main
+
+remote_integration_test_task:
+    <<: *local_integration_test_task
+    alias: remote_integration_test
+
+local_system_test_task: &local_system_test_task
+    alias: local_system_test
+    only_if: &blahblah >-
+        $CIRRUS_TAG == '' &&
+        $CIRRUS_CHANGE_TITLE !=~ '.*CI:DOCS.*' &&
+        $CIRRUS_CHANGE_TITLE !=~ '.*CI:BUILD.*' &&
+        $CIRRUS_CRON != 'multiarch'
+    depends_on:
+        - build
+        - local_integration_test
+    matrix: *platform_axis
+    container: *smallcontainer
+    setup_script: *setup
+    main_script: *main
+
+should_duplicate_task:
+    <<: *local_system_test_task
+    alias: should_duplicate
+    depends_on:
+        - remote_integration_test
+    matrix:
+        - env: *stdenvars
