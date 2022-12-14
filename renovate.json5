@@ -1,0 +1,88 @@
+/*
+   Renovate is a service similar to GitHub Dependabot, but with
+   (fantastically) more configuration options.  So many options
+   in fact, if you're new I recommend glossing over this cheat-sheet
+   prior to the official documentation:
+
+   https://www.augmentedmind.de/2021/07/25/renovate-bot-cheat-sheet
+
+   Configuration Update/Change Procedure:
+     1. Make changes
+     2. Manually validate changes (from repo-root):
+
+        podman run -it \
+            -v ./renovate.json5:/usr/src/app/renovate.json5:z \
+            docker.io/renovate/renovate:latest \
+            renovate-config-validator
+     3. Commit.
+
+   Configuration Reference:
+   https://docs.renovatebot.com/configuration-options/
+
+   Monitoring Dashboard:
+   https://app.renovatebot.com/dashboard#github/containers
+
+   Note: The Renovate bot will create/manage it's business on
+         branches named 'renovate/*'.  Otherwise, and by
+         default, the only the copy of this file that matters
+         is the one on the `main` branch.  No other branches
+         will be monitored or touched in any way.
+*/
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  /*************************************************
+   ****** Global/general configuration options *****
+   *************************************************/
+
+  // Re-use predefined sets of configuration options to DRY
+  "extends": [
+    // https://github.com/containers/automation/blob/main/renovate/defaults.json5
+    "github>containers/automation//renovate/defaults.json5"
+  ],
+
+  // Permit automatic rebasing when base-branch changes by more than
+  // one commit.
+  "rebaseWhen": "behind-base-branch",
+
+  /*************************************************
+   *** Repository-specific configuration options ***
+   *************************************************/
+
+  // Don't leave dep. update. PRs "hanging", assign them to people.
+  "assignees": ["cevich"],
+
+  /**************************************************
+   ***** Manager-specific configuration options *****
+   **************************************************/
+
+  "regexManagers": [
+    {
+      "fileMatch": "^.cirrus.yml$",
+      // Expected veresion format: c<automation_images IMG_SFX value>
+      // For example `c20230120t152650z-f37f36u2204`
+      "matchStrings": ["c(?<currentValue>20\\d{6}t\\d{6}z-\\w+)"],
+      "depNameTemplate": "containers/automation_images",
+      "datasourceTemplate": "github-tags",
+      // N/B: Must match exactly to 'versioning' in the 'regex' package rule.
+      "versioningTemplate": "regex:^(?<major>20\\d{6})t(?<minor>\\d{6})z-(?<compatibility>\\w+)$"
+    },
+  ],
+
+  // N/B: LAST MATCHING RULE WINS, match statems are ANDed together.
+  // https://docs.renovatebot.com/configuration-options/#packagerules
+  "packageRules": [
+    // Group together all CI VM image updates into a single PR.  This is needed
+    // to handle the case where an IMG_SFX is mentioned in a comment.  For
+    // example, flagging an important TODO or FIXME item.  Or, where CI VM
+    // images are split across multiple IMG_SFX values that all need to be updated.
+    {
+      "matchManagers": ["regex"],
+      "matchFiles": [".cirrus.yml"],  // full-path exact-match
+      "groupName": "CI VM Image",
+      // N/B: Must match exactly to 'versioningTemplate' in the regex manager.
+      "versioning": "regex:^(?<major>20\\d{6})t(?<minor>\\d{6})z-(?<compatibility>\\w+)$"
+    },
+  ],
+}
