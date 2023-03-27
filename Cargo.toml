@@ -1,0 +1,75 @@
+[package]
+name = "netavark"
+version = "1.6.0-dev"
+edition = "2018"
+authors = ["github.com/containers"]
+license = "Apache-2.0"
+readme = "README.md"
+description = "A container network stack"
+homepage = "https://github.com/containers/netavark"
+repository = "https://github.com/containers/netavark"
+categories = ["containers", "networking", "podman"]
+exclude = ["/.cirrus.yml", "/.github/*", "/hack/*"]
+build = "build.rs"
+
+[package.metadata.vendor-filter]
+# This list is not exhaustive.
+platforms = ["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "powerpc64le-unknown-linux-gnu",
+             "s390x-unknown-linux-gnu", "riscv64gc-unknown-linux-gnu",
+             "x86_64-unknown-linux-musl", "aarch64-unknown-linux-musl",
+             ]
+
+[[bin]]
+name = "netavark"
+path = "src/main.rs"
+
+[[bin]]
+name = "netavark-dhcp-proxy-client"
+path = "src/dhcp_proxy_client/client.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[features]
+default = ["serde", "deps-serde"]
+deps-serde = ["chrono/serde", "url/serde"]
+
+[dependencies]
+anyhow = "1.0"
+clap = { version = "3.2.23", features = ["derive"] }
+env_logger = "0.10.0"
+ipnet = { version = "2", features = ["serde"] }
+iptables = "0.5"
+libc = "0.2"
+log = "0.4.17"
+serde = { version = "1.0.158", features = ["derive"], optional = true }
+serde-value = "0.7.0"
+serde_json = "1.0.93"
+sysctl = "0.5.4"
+url = "2.3.1"
+zbus = { version = "3.11.1" }
+nix = "0.26.2"
+rand = "0.8.5"
+sha2 = "0.10.6"
+netlink-packet-route = "0.15"
+netlink-packet-core = "0.5"
+fs2 = "0.4.3"
+netlink-sys = "0.8.4"
+tokio = { version = "1.26", features = ["rt", "rt-multi-thread", "signal", "fs"] }
+tokio-stream = { version = "0.1", features = ["net"] }
+tonic = "0.8"
+mozim = "0.2"
+prost = "0.11"
+futures-channel="0.3"
+futures-core = "0.3"
+futures-util = "0.3"
+nispor = "1.2.7"
+http = "0.2.8"
+macaddr = "1.0.1"
+tower = { version = "0.4" }
+
+[build-dependencies]
+chrono = { version = "0.4.22", default-features = false, features = ["clock"] }
+tonic-build = "0.8"
+
+[dev-dependencies]
+once_cell = "1.8.0"
+rand = "0.8.5"
