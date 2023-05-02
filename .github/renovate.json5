@@ -1,0 +1,171 @@
+/*
+
+Validate this file before commiting with (from repository root):
+
+    podman run -it \
+        -v ./.github/renovate.json5:/usr/src/app/renovate.json5:z \
+        docker.io/renovate/renovate:latest \
+        renovate-config-validator
+
+*/
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  "description": "This is a basic preset intended\
+  for reuse to reduce the amount of boiler-plate\
+  configuration that otherwise would need to be\
+  duplicated. It should be referenced from other\
+  repositories renovate config under the 'extends'\
+  section as:\
+  github>containers/automation//renovate/defaults.json5\
+  (optionally with a '#X.Y.Z' version-tag suffix).",
+
+  /*************************************************
+   ****** Global/general configuration options *****
+   *************************************************/
+
+  // Re-use predefined sets of configuration options to DRY
+  "extends": [
+    // https://docs.renovatebot.com/presets-config/#configbase
+    "config:base",
+
+    // https://docs.renovatebot.com/presets-default/#gitsignoff
+    ":gitSignOff",
+
+    // Always rebase dep. update PRs from `main` when PR is stale
+    ":rebaseStalePrs",
+  ],
+
+  // The default setting is ambiguous, explicitly base schedules on UTC
+  "timezone": "UTC",
+
+  // Don't swamp CI, rate-limit opening of PRs w/in schedule limits.
+  "prHourlyLimit": 1,
+
+  // Make renovate PRs stand out from the crowd
+  "labels": ["dependencies"],
+
+  // Default setting is an "empty" schedule.  Explicitly set this
+  // such that security-alert PRs may be opened immediately.
+  "vulnerabilityAlerts": {
+    "labels": ["dependencies", "security"],
+  },
+
+  // On a busy repo, automatic-rebasing will swamp the CI system.
+  // Turn it off here, then allow individual repos. to override/enable
+  // it as appropriate.
+  "rebaseWhen": "never",
+
+  /*************************************************
+   ***** Golang-specific configuration options *****
+   *************************************************/
+
+  "golang": {
+    // disabled by default, safe to enable since "tidy" enforced by CI.
+    "postUpdateOptions": ["gomodTidy"],
+
+    // In case a version in use is retracted, allow going backwards.
+    // N/B: This is NOT compatible with pseudo versions, see below.
+    "rollbackPrs": false,
+
+    // Preserve (but continue to upgrade) any existing SemVer ranges.
+    "rangeStrategy": "replace",
+
+    // N/B: LAST MATCHING RULE WINS
+    // https://docs.renovatebot.com/configuration-options/#packagerules
+    "packageRules": [
+      // Golang pseudo-version packages will spam with every Commit ID change.
+      // Limit update frequency.
+      {
+        "matchUpdateTypes": ["digest"],
+        "schedule": ["after 1am and before 11am on the first day of the month"],
+      },
+      // Package version retraction (https://go.dev/ref/mod#go-mod-file-retract)
+      // is broken in Renovate.  And no repo should use these retracted versions.
+      // ref: https://github.com/renovatebot/renovate/issues/13012
+      {
+        "matchPackageNames": ["github.com/containers/common"],
+        // Both v1.0.0 and v1.0.1 should be ignored.
+        "allowedVersions": "!/v((1.0.0)|(1.0.1))$/"
+      },
+    ],
+  },
+
+  /*************************************************
+   ***** Rust-specific configuration options *****
+   *************************************************/
+
+  "rust": {
+    // Update both Cargo.toml and Cargo.lock when possible
+    // i.e. bump the range even if the new version satisfies the existing range.
+    // https://docs.renovatebot.com/configuration-options/#rangestrategy
+    "rangeStrategy": "bump",
+  },
+
+  /*************************************************
+   ***** Python-specific configuration options *****
+   *************************************************/
+
+  "python": {
+    // Preserve (but continue to upgrade) any existing SemVer ranges.
+    "rangeStrategy": "replace",
+  },
+
+  /**************************************************
+   ***** Manager-specific configuration options *****
+   **************************************************/
+
+  "regexManagers": [
+    {
+      "fileMatch": "^.cirrus.yml$",
+      // Expected veresion format: c<automation_images IMG_SFX value>
+      // For example `c20230120t152650z-f37f36u2204`
+      "matchStrings": ["c(?<currentValue>20\\d{6}t\\d{6}z-\\w+)"],
+      "depNameTemplate": "containers/automation_images",
+      "datasourceTemplate": "github-tags",
+      "versioningTemplate": "loose",
+      "autoReplaceStringTemplate": "c{{{newVersion}}}",
+    },
+  ],
+
+  // N/B: LAST MATCHING RULE WINS, match statems are ANDed together.
+  // https://docs.renovatebot.com/configuration-options/#packagerules
+  "packageRules": [
+    // Workaround: rollbackPRs are not compatible with digest updates.
+    // This is a catch-the-rest rule which must appear AFTER the go
+    // "digest" rule (above).
+    // Ref: https://github.com/renovatebot/renovate/discussions/18250
+    {
+      "matchLanguages": ["go"],
+      // Open rollback PR if updated dep. is removed (i.e. tag pulled
+      // due to major bug or security issue).
+      "rollbackPrs": true,
+    },
+
+    // Github-action updates cannot consistently be tested in a PR.
+    // This is caused by an unfixable architecture-flaw: Execution
+    // context always depends on trigger, and we (obvious) can't know
+    // that ahead of time for all workflows.  Abandon all hope and
+    // mark github-action dep. update PRs '[skip-ci]'
+    {
+      "matchManagers": ["github-actions"],
+      "matchDepTypes": ["action"],
+      "commitMessagePrefix": "[skip-ci]"
+    },
+
+    // Group together all CI VM image updates into a single PR.  This is needed
+    // to handle the case where an IMG_SFX is mentioned in a comment.  For
+    // example, flagging an important TODO or FIXME item.  Or, where CI VM
+    // images are split across multiple IMG_SFX values that all need to be updated.
+    {
+      "matchManagers": ["regex"],
+      "matchFiles": [".cirrus.yml"],  // full-path exact-match
+      "groupName": "CI VM Image",
+      // Somebody(s) need to stay on top of PRs as soon as they open.
+      "assignees": ["cevich"],
+      // Don't wait, roll out CI VM Updates immediately
+      "schedule": ["at any time"],
+    },
+  ],
+}
