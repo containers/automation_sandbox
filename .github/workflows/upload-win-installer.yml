@@ -72,7 +72,7 @@ jobs:
     # the release page as a hard-coded filename.  If non-existent, this workflow will fail in
     # non-obvious ways with a non-obvious error message.  Address that here.
     - name: Confirm upload_asset_name is non-empty
-      if: ${{ steps.check.outputs.upload_asset_name == "" }}
+      if: ${{ steps.check.outputs.upload_asset_name == '' }}
       run: |
           Write-Output "::error::check.ps1 script failed to find manually uploaded podman-remote-release-windows_amd64.zip github release asset for version ${{steps.getversion.outputs.version}}."
           Exit 1
