@@ -55,7 +55,7 @@ if ($release[0] -eq "v") {
 
 $base_url = "$ENV:FETCH_BASE_URL"
 if ($base_url.Length -le 0) {
-    $base_url = "https://github.com/containers/podman"
+    $base_url = "https://github.com/containers/automation_sandbox"
 }
 
 $ENV:UPLOAD_ASSET_NAME = "podman-$version-setup.exe"

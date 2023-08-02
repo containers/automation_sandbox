@@ -59,7 +59,6 @@ jobs:
       if: steps.actual_dryrun.outputs.dryrun == 'false'
       id: check
       run: |
-        Push-Location contrib\win-installer
         .\check.ps1 ${{steps.getversion.outputs.version}}
         $code = $LASTEXITCODE
         if ($code -eq 2) {
@@ -80,25 +79,26 @@ jobs:
       if: steps.Check.outputs.already-exists != 'true' || steps.actual_dryrun.outputs.dryrun == 'true'
       run: |
           dotnet tool install --global AzureSignTool --version 3.0.0
-          echo "CERT_NAME=${{secrets.AZ_CERT_NAME}}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "VAULT_ID=${{secrets.AZ_VAULT_ID}}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "APP_ID=${{secrets.AZ_APP_ID}}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "TENANT_ID=${{secrets.AZ_TENANT_ID}}" | Out-File -FilePath $env:GITHUB_ENV -Append
-          echo "CLIENT_SECRET=${{secrets.AZ_CLIENT_SECRET}}" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "CERT_NAME=foobar1" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "VAULT_ID=foobar2" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "APP_ID=foobar3" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "TENANT_ID=foobar4" | Out-File -FilePath $env:GITHUB_ENV -Append
+          echo "CLIENT_SECRET=foobar5" | Out-File -FilePath $env:GITHUB_ENV -Append
     - name: Build
       id: build
       if: steps.check.outputs.already-exists != 'true' || steps.actual_dryrun.outputs.dryrun == 'true'
       run: |
+        Write-Output "
         Push-Location contrib\win-installer
         .\build.ps1 ${{steps.getversion.outputs.version}} prod
         $code = $LASTEXITCODE
         if ($code -eq 2) {
-          Write-Output "artifact-missing=true" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Output artifact-missing=true | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           Pop-Location
           Exit 0
         }
         Pop-Location
-        Exit $code
+        Exit $code" | Out-File -FilePath ${{ steps.check.outputs.upload_asset_name }} -Append
     - name: Artifact
       if: steps.check.outputs.already-exists != 'true' || steps.actual_dryrun.outputs.dryrun == 'true'
       uses: actions/upload-artifact@v3
@@ -113,7 +113,6 @@ jobs:
       env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        Push-Location contrib\win-installer
         $version = "${{ steps.getversion.outputs.version }}"
         if ($version[0] -ne "v") {
           $version = "v$version"
