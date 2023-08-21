@@ -41,7 +41,9 @@ jobs:
   closed_issue_discussion_lock:
     name: "Lock closed Issue/PR discussions"
     runs-on: ubuntu-latest
-    permissions: write-all
+    permissions:
+      issues: write
+      pull-requests: write
     steps:
       # Ref: https://github.com/dessant/lock-threads#usage
       - uses: dessant/lock-threads@v4
