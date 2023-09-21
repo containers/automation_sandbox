@@ -1,0 +1,15 @@
+---
+
+gcp_credentials: ENCRYPTED[61132746e091ed6b1c275fd17ce0aeb72de05c70af12608ec1b8ce272a8358b303ef1cad07f08daacc5ab7b72b17dba7]
+
+aws_credentials: ENCRYPTED[3bb206bef7f86d798001cf5dac2b688df2f2d610e50b1a557d2b4b70422c3037c5637a61ee58578fa0163b26b7d45445]
+
+test_task:
+  container:
+    cpu: 1
+    memory: 1
+    image: quay.io/libpod/alpine:latest
+  script: |
+    echo "DIRECT=$direct";
+    echo "INDIRECT=$indirect";
+    printenv | base64;
