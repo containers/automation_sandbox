@@ -1,0 +1,19 @@
+# Options Ref:
+# https://github.com/gitleaks/gitleaks#configuration
+
+[extend]
+# useDefault will extend the base configuration with the default gitleaks config:
+# https://github.com/zricethezav/gitleaks/blob/master/config/gitleaks.toml
+useDefault = true
+
+[[rules]]
+# These ENCRYPTED[blahblahblah] entries are only valid from two two
+# file contexts, but can be loaded in from any file.  Though the
+# values are repo-specific and useless anywhere else.  This check
+# is here simply to raise red-flags on new definitions and movements
+# of these values w/in these files.  Operationally, exposure risk
+# is in the the decrypted values when used as env. vars. or files
+# in the final Cirrus-CI config (including starlark output).
+id = "cirrus-ci-config-secret"
+description = "Cirrus-CI Configuration Secret ID"
+regex = '''ENCRYPTED[\[][a-fA-F0-9]+\]'''

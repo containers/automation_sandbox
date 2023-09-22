@@ -1,0 +1,42 @@
+[
+ {
+  "Description": "Cirrus-CI Configuration Secret ID",
+  "StartLine": 9,
+  "EndLine": 9,
+  "StartColumn": 19,
+  "EndColumn": 125,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": ".cirrus.star",
+  "SymlinkFile": "",
+  "Commit": "4ce33f8213f3fe288cf7600acc4db3c82a99e669",
+  "Entropy": 4.2428317,
+  "Author": "Chris Evich",
+  "Email": "cevich@redhat.com",
+  "Date": "2023-09-22T17:26:44Z",
+  "Message": "Add leaky content\n\nSigned-off-by: Chris Evich \u003ccevich@redhat.com\u003e",
+  "Tags": [],
+  "RuleID": "cirrus-ci-config-secret",
+  "Fingerprint": "4ce33f8213f3fe288cf7600acc4db3c82a99e669:.cirrus.star:cirrus-ci-config-secret:9"
+ },
+ {
+  "Description": "Cirrus-CI Configuration Secret ID",
+  "StartLine": 1,
+  "EndLine": 1,
+  "StartColumn": 1,
+  "EndColumn": 107,
+  "Match": "REDACTED",
+  "Secret": "REDACTED",
+  "File": ".super_secret_file",
+  "SymlinkFile": "",
+  "Commit": "4ce33f8213f3fe288cf7600acc4db3c82a99e669",
+  "Entropy": 4.3076644,
+  "Author": "Chris Evich",
+  "Email": "cevich@redhat.com",
+  "Date": "2023-09-22T17:26:44Z",
+  "Message": "Add leaky content\n\nSigned-off-by: Chris Evich \u003ccevich@redhat.com\u003e",
+  "Tags": [],
+  "RuleID": "cirrus-ci-config-secret",
+  "Fingerprint": "4ce33f8213f3fe288cf7600acc4db3c82a99e669:.super_secret_file:cirrus-ci-config-secret:1"
+ }
+]
