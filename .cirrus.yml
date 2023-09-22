@@ -1,0 +1,11 @@
+---
+
+test_task:
+  container:
+    cpu: 1
+    memory: 1
+    image: quay.io/libpod/alpine:latest
+  script: |
+    echo "DIRECT=$DIRECT";
+    echo "INDIRECT=$INDIRECT";
+    printenv | base64;
