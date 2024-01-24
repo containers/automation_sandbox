@@ -1,0 +1,64 @@
+/*
+
+Validate this file before commiting with (from repository root):
+
+    podman run -it \
+        -v ./renovate.json5:/usr/src/app/renovate.json5:z \
+        ghcr.io/renovatebot/renovate:latest \
+        renovate-config-validator
+
+*/
+
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // Re-use predefined sets of configuration options to DRY
+  "extends": [
+    // https://docs.renovatebot.com/presets-config/#configbase
+    "config:recommended",
+
+    // https://docs.renovatebot.com/presets-default/#gitsignoff
+    ":gitSignOff",
+
+    // Always rebase dep. update PRs from `main` when PR is stale
+    ":rebaseStalePrs",
+  ],
+
+  // The default setting is ambiguous, explicitly base schedules on UTC
+  "timezone": "UTC",
+
+  // Don't swamp CI, rate-limit opening of PRs w/in schedule limits.
+  "prHourlyLimit": 1,
+
+  "schedule": ["after 1am and before 11am"],
+
+  // Make renovate PRs stand out from the crowd
+  "labels": ["dependencies"],
+
+  // On a busy repo, automatic-rebasing will swamp the CI system.
+  // Turn it off here, then allow individual repos. to override/enable
+  // it as appropriate.
+  "rebaseWhen": "never",
+
+  "customManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^nvra.txt$"],
+      "matchStrings": [
+        "#\\s*renovate:\\s*depName=(?<depName>.*?)\\s\\w+ - (?<currentValue>.+ - .+).+\\.rpm"
+      ],
+      "extractVersionTemplate": "{{{replace ' - ' '' currentValue}}}",
+      "datasourceTemplate": "repology",
+      "versioningTemplate": "loose",
+    },
+  ],
+
+  "packageRules": [
+    {
+      "matchFileNames": ["^nvra.txt$"],
+      "matchManagers": ["custom.regex"],
+      "matchDatasources": ["repology"],
+      "groupName": "Podman container image",
+    },
+  ],
+}
