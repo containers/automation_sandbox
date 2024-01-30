@@ -8,7 +8,7 @@
 ARG BASE_REGISTRY="registry.fedoraproject.org"
 ARG BASE_NAMESPACE="/"
 ARG BASE_IMGNAME="fedora"
-ARG BASE_TAG="39"  # Do not modify manually, run maintain_packages.sh instead.
+ARG BASE_TAG="40"  # Do not modify manually, run maintain_packages.sh instead.
 # Must run maintain_packages.sh following any changes to the two values below.
 ARG INST_PKGS="podman fuse-overlayfs openssh openssh-clients"
 ARG EXCL_PKGS="container-selinux"
