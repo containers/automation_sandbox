@@ -1,0 +1,8 @@
+test_task:
+    name: "Test"
+    persistent_worker:
+        labels:
+            os: darwin
+            arch: arm64
+            purpose: prod # FIXME add your own worker labels here
+    test_script: true
