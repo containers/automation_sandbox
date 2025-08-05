@@ -13,12 +13,11 @@ permissions:
   contents: read
   pull-requests: write
   actions: read
-  search: read
 
 jobs:
   screenshot_and_comment:
-    # This job only runs if the pull request was merged.
-    if: github.event.pull_request.merged == true
+    # This job only runs if the pull request was merged AND it's from a first-time contributor.
+    if: github.event.pull_request.merged == true && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR'
     runs-on: ubuntu-latest
     steps:
       # Step 1: Check out the repository containing the certificate HTML file.
@@ -29,33 +28,9 @@ jobs:
           repository: containers/automation
           path: automation-repo # Checkout into a specific directory
 
-      # Step 2: Check if this is the contributor's first merged PR
-      # This step uses the GitHub API to search for all merged PRs by the author in this repo.
-      # If the count is exactly 1, it's their first, and we proceed.
-      - name: Check for first-time contributor
-        id: check_first_pr
-        uses: actions/github-script@v7
-        with:
-          script: |
-            const author = context.payload.pull_request.user.login;
-            const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged author:${author}`;
-            const result = await github.rest.search.issuesAndPullRequests({ q: query });
-            const mergedPRs = result.data.total_count;
-
-            console.log(`Found ${mergedPRs} merged PR(s) from @${author}.`);
-
-            if (mergedPRs === 1) {
-              console.log(`This is the first merged PR from @${author}. Proceeding to generate certificate.`);
-              core.setOutput('is_first_pr', 'true');
-            } else {
-              console.log(`@${author} has ${mergedPRs} merged PRs. No certificate will be generated.`);
-              core.setOutput('is_first_pr', 'false');
-            }
-
-      # Step 3: Update the HTML file locally
-      # This step only runs if the check for a first-time contributor passes.
+      # Step 2: Update the HTML file locally
+      # This step only runs if the conditions in the job's `if` statement are met.
       - name: Update HTML file
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         run: |
           # The path to your HTML file inside the checked-out directory
           HTML_FILE="automation-repo/certificate-generator/certificate_generator.html"
@@ -78,21 +53,18 @@ jobs:
           # Update the value for the merge date input.
           sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE}
 
-      # Step 4: Setup Node.js environment
+      # Step 3: Setup Node.js environment
       - name: Setup Node.js
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # Step 5: Install Puppeteer
+      # Step 4: Install Puppeteer
       - name: Install Puppeteer
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         run: npm install puppeteer
 
-      # Step 6: Take a screenshot of the certificate div
+      # Step 5: Take a screenshot of the certificate div
       - name: Take screenshot
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         run: |
           node -e "
           const puppeteer = require('puppeteer');
@@ -119,18 +91,16 @@ jobs:
           "
         id: screenshot
 
-      # Step 7: Upload screenshot as a workflow artifact
+      # Step 6: Upload screenshot as a workflow artifact
       - name: Upload screenshot artifact
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: certificate-preview
           path: certificate.png
           retention-days: 7 # Keep the artifact for 7 days
 
-      # Step 8: Comment on Pull Request with a link to the artifact
+      # Step 7: Comment on Pull Request with a link to the artifact
       - name: Comment with link to artifact
-        if: steps.check_first_pr.outputs.is_first_pr == 'true'
         uses: actions/github-script@v7
         with:
           script: |
