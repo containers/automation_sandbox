@@ -73,9 +73,11 @@ jobs:
         run: npm install puppeteer
 
       # Step 5: Take a screenshot of the certificate div
-      - name: Take screenshot
+      - name: Create and run screenshot script
+        id: screenshot
         run: |
-          node -e "
+          # Create a separate JavaScript file to run with Node.js. This is cleaner than a long one-liner.
+          cat <<'EOF' > screenshot.js
           const puppeteer = require('puppeteer');
           const path = require('path');
 
@@ -84,21 +86,36 @@ jobs:
               args: ['--no-sandbox', '--disable-setuid-sandbox'],
             });
             const page = await browser.newPage();
-            // Point to the local, modified HTML file inside the checked-out directory
             const htmlPath = 'file://' + path.resolve('automation-repo/certificate-generator/certificate_generator.html');
+            
+            console.log(`Navigating to: ${htmlPath}`);
             await page.goto(htmlPath, { waitUntil: 'networkidle0' });
+            
             await page.setViewport({ width: 1080, height: 720 });
+            
+            // Find the specific element to screenshot using its CSS selector.
+            // This is the line that was likely causing the error.
+            console.log('Looking for element #certificatePreview...');
             const element = await page.$('#certificatePreview');
+            
             if (!element) {
-              console.error('Could not find element with id certificatePreview');
+              console.error('Could not find element with id "certificatePreview". Please ensure it exists in the HTML file.');
               process.exit(1);
             }
+            
+            console.log('Element found. Taking screenshot...');
             await element.screenshot({ path: 'certificate.png' });
+            
             await browser.close();
             console.log('Screenshot taken and saved as certificate.png');
-          })();
-          "
-        id: screenshot
+          })().catch(err => {
+            console.error(err);
+            process.exit(1);
+          });
+          EOF
+
+          # Execute the script
+          node screenshot.js
 
       # Step 6: Upload screenshot as a workflow artifact
       - name: Upload screenshot artifact
@@ -122,3 +139,7 @@ jobs:
               repo: context.repo.repo,
               body: body,
             });
+
+
+
+
