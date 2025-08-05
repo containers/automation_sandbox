@@ -1,0 +1,165 @@
+---
+
+# Main collection of env. vars to set for all tasks and scripts.
+env:
+    ####
+    #### Global variables used for all tasks
+    ####
+    # Save a little typing (path relative to $CIRRUS_WORKING_DIR)
+    SCRIPT_BASE: "./contrib/cirrus"
+    PODBIN_NAME: podman      # 'podman' or 'remote'
+    TEST_ENVIRON: host 
+    CI_DESIRED_RUNTIME: crun    # As of 2024-05-28 there are no other supported runtimes
+    CI_DESIRED_DATABASE: sqlite # 'sqlite' or 'boltdb'
+    CI_DESIRED_STORAGE: overlay # overlay, vfs, or composefs (which is actually overlay)
+    # Curl-command prefix for downloading task artifacts, simply add the
+    # the url-encoded task name, artifact name, and path as a suffix.
+    ART_URL: https://api.cirrus-ci.com/v1/artifact/build/${CIRRUS_BUILD_ID}
+    ARTCURL: >-
+        curl --retry 5 --retry-delay 8 --fail --location -O
+        --url ${ART_URL}
+
+request-mac_task:
+  name: Request MAC
+  alias: request-mac
+  env:
+    AWS_ACCESS_KEY_ID: ${AWSAK}
+    AWS_SECRET_ACCESS_KEY: ${AWSSK}
+    AWS_DEFAULT_REGION: "us-east-1"
+    CIRRUS_POOL: ${CPWP}
+  container:
+    image: ghcr.io/redhat-developer/mapt:pr-382
+  request_script: |
+    mapt aws mac-pool request \
+      --name devtools-1 \
+      --version 15 \
+      --arch m2 \
+      --conn-details-output ${CIRRUS_WORKING_DIR} \
+      --it-cirrus-pw-token ${CIRRUS_POOL} \
+      --it-cirrus-pw-labels purpose=stage 
+  mapt_artifacts:
+    path: "${CIRRUS_WORKING_DIR}/dedicated_host_id"
+    type: text/plain
+
+# podman-machine-test_task:
+#   name: Test Podman Machine
+#   alias: podman-machine-test
+#   depends_on:
+#     - request-mac
+#   persistent_worker:
+#     labels:
+#       os: darwin
+#       arch: arm64
+#       purpose: stage
+#   test_script: |
+#       echo "running on-premise"
+#       curl -o podman-machine.pkg -L https://github.com/containers/podman/releases/download/v5.4.0-rc2/podman-installer-macos-arm64.pkg
+#       sudo installer -pkg podman-machine.pkg -target /
+#       export PATH=/opt/podman/bin:$PATH
+#       export CONTAINERS_MACHINE_PROVIDER=applehv
+#       podman machine init
+#       podman machine start
+
+# Confirm building the remote client, natively on a Mac OS-X VM.
+osx_alt_build_task:
+  name: "Build for MacOS amd64+arm64" # N/B: Referenced by URLencoded strings elsewhere
+  depends_on:
+    - request-mac
+  alias: osx_alt_build
+  # Docs: ./contrib/cirrus/CIModes.md
+  persistent_worker: &mac_pw
+    labels:
+      os: darwin
+      arch: arm64
+      purpose: stage
+  env: &mac_env
+    CIRRUS_SHELL: "/bin/bash"  # sh is the default
+    CIRRUS_REPO_CLONE_URL: https://github.com/containers/podman.git
+    PATH: "/opt/homebrew/bin:$PATH"
+    # Prevent cache-pollution fron one task to the next.
+    GOPATH: "$CIRRUS_WORKING_DIR/.go"
+    GOCACHE: "$CIRRUS_WORKING_DIR/.go/cache"
+    GOENV: "$CIRRUS_WORKING_DIR/.go/support"
+    GOSRC: "${CIRRUS_WORKING_DIR}"
+  clone_script: |
+    git clone $CIRRUS_REPO_CLONE_URL $CIRRUS_WORKING_DIR
+  lint_script:
+    - make golangci-lint
+  basic_build_script:
+    - make .install.ginkgo
+    - make podman-remote
+    - make podman-mac-helper
+  build_pkginstaller_script:
+    - pushd contrib/pkginstaller
+    - make ARCH=amd64 NO_CODESIGN=1 pkginstaller
+    - make ARCH=aarch64 NO_CODESIGN=1 pkginstaller
+    - make ARCH=universal NO_CODESIGN=1 pkginstaller
+    - popd
+  build_amd64_script:
+    - make podman-remote-release-darwin_amd64.zip
+  # Building arm podman needs to be the last thing built in this task
+  # The Mac tests rely this Podman binary to run, and the CI Mac is ARM-based
+  build_arm64_script:
+    - make podman-remote-release-darwin_arm64.zip
+  # Produce a new repo.tar.zst artifact for consumption by dependent tasks.
+  repo_prep_script: &repo_prep >-
+    tar --zstd -cf /tmp/repo.tar.zst -C $GOSRC . && mv /tmp/repo.tar.zst $GOSRC/
+  repo_artifacts: &repo_artifacts
+    path: ./repo.tar.zst
+    type: application/octet-stream
+
+podman_machine_mac_task:
+  name: "Test MacOS arm64"
+  alias: podman_machine_mac
+  depends_on: osx_alt_build
+  persistent_worker: *mac_pw
+  timeout_in: 45m
+  env:
+    <<: *mac_env
+    DISTRO_NV: "darwin"
+    PRIV_NAME: "rootless"  # intended use-case
+    PATH: ${CIRRUS_WORKING_DIR/bin/darwin}:/opt/homebrew/bin:$PATH
+  matrix:
+    # - env:
+    #     # See contrib/cirrus/mac_runner.sh
+    #     TEST_FLAVOR: "machine-applehv"
+    - env:
+        # See contrib/cirrus/mac_runner.sh
+        TEST_FLAVOR: "machine-libkrun"
+  clone_script:  # artifacts from osx_alt_build_task
+    - mkdir -p $CIRRUS_WORKING_DIR
+    - cd $CIRRUS_WORKING_DIR
+    - $ARTCURL/osx_alt_build/repo/repo.tar.zst
+    - tar -xf repo.tar.zst
+  setup_script: "contrib/cirrus/mac_setup.sh"
+  # env_script: "contrib/cirrus/mac_env.sh"
+  # TODO: Timeout bumped b/c initial image download (~5min) and VM
+  #       resize (~2min) causes test-timeout (90s default).  Should
+  #       tests deal with this internally?
+  test_script:
+      - "contrib/cirrus/mac_runner.sh"
+  # This host is/was shared with potentially many other CI tasks.
+  # Ensure nothing is left running while waiting for the next task.
+  always:
+    # Required for `contrib/cirrus/logformatter` to work properly
+    html_artifacts:
+        path: ./*.html
+        type: text/html
+
+release-mac_task:
+  name: Release MAC
+  depends_on:
+    - podman_machine_mac
+  env:
+    AWS_ACCESS_KEY_ID: ${AWSAK}
+    AWS_SECRET_ACCESS_KEY: ${AWSSK}
+    AWS_DEFAULT_REGION: "us-east-1"
+  container:
+    image: ghcr.io/redhat-developer/mapt:pr-382
+  clone_script:
+    true
+  release_script: |
+    time $ARTCURL/request-mac/mapt/dedicated_host_id
+    mapt aws mac-pool release \
+      --dedicated-host-id $(cat dedicated_host_id)
+
