@@ -53,14 +53,14 @@ jobs:
           # Get the current date in a nice format
           MERGE_DATE=$(date -u +"%B %d, %Y")
 
-          # Update the value for the contributor name input.
-          sed -i "/id=\"contributorName\"/s/value=\"[^\"]*\"/value=\"${CONTRIBUTOR_NAME}\"/" ${HTML_FILE}
+          # Update the value for the contributor name input, with failure logging.
+          sed -i "/id=\"contributorName\"/s/value=\"[^\"]*\"/value=\"${CONTRIBUTOR_NAME}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update contributor name in HTML file."; exit 1; }
+          
+          # Update the value for the PR number input, with failure logging.
+          sed -i "/id=\"prNumber\"/s/value=\"[^\"]*\"/value=\"#${PR_NUMBER}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update PR number in HTML file."; exit 1; }
 
-          # Update the value for the PR number input.
-          sed -i "/id=\"prNumber\"/s/value=\"[^\"]*\"/value=\"#${PR_NUMBER}\"/" ${HTML_FILE}
-
-          # Update the value for the merge date input.
-          sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE}
+          # Update the value for the merge date input, with failure logging.
+          sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update merge date in HTML file."; exit 1; }
 
       # Step 3: Setup Node.js environment
       - name: Setup Node.js
@@ -70,7 +70,8 @@ jobs:
 
       # Step 4: Install Puppeteer
       - name: Install Puppeteer
-        run: npm install puppeteer
+        run: |
+          npm install puppeteer || { echo "ERROR: Failed to install Puppeteer via npm."; exit 1; }
 
       # Step 5: Take a screenshot of the certificate div
       - name: Create and run screenshot script
@@ -94,7 +95,6 @@ jobs:
             await page.setViewport({ width: 1080, height: 720 });
             
             // Find the specific element to screenshot using its CSS selector.
-            // This is the line that was likely causing the error.
             console.log('Looking for element #certificatePreview...');
             const element = await page.$('#certificatePreview');
             
@@ -109,13 +109,13 @@ jobs:
             await browser.close();
             console.log('Screenshot taken and saved as certificate.png');
           })().catch(err => {
-            console.error(err);
+            console.error('An error occurred during the screenshot process:', err);
             process.exit(1);
           });
           EOF
 
-          # Execute the script
-          node screenshot.js
+          # Execute the script and echo a clear error message on failure.
+          node screenshot.js || { echo "ERROR: The screenshot script failed to execute."; exit 1; }
 
       # Step 6: Upload screenshot as a workflow artifact
       - name: Upload screenshot artifact
@@ -123,7 +123,7 @@ jobs:
         with:
           name: certificate-preview
           path: certificate.png
-          retention-days: 7 # Keep the artifact for 7 days
+          retention-days: 7
 
       # Step 7: Comment on Pull Request with a link to the artifact
       # This step only runs for the pull_request trigger, not manual runs.
@@ -139,6 +139,14 @@ jobs:
               repo: context.repo.repo,
               body: body,
             });
+
+  notify_skip:
+    # This job runs only if the main job's conditions for a PR are not met.
+    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Notify that the action is skipped for a returning contributor
+        run: echo "Skipping certificate generation because @${{ github.event.pull_request.user.login }} is not a first-time contributor."
 
 
 
