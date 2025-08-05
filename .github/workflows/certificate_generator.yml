@@ -1,0 +1,148 @@
+# .github/workflows/certificate_generator.yml
+name: Generate Contributor Certificate Preview
+
+# This action triggers when a pull request is merged into the main branch.
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+# We only want to run this if the PR was actually merged.
+if: github.event.pull_request.merged == true
+
+# Permissions needed for this workflow.
+# pull-requests: write - to comment on the pull request.
+# contents: read - to check out the code from another repository.
+# actions: read - to get the URL of the workflow run.
+# search: read - to search for previous PRs by the author.
+permissions:
+  contents: read
+  pull-requests: write
+  actions: read
+  search: read
+
+jobs:
+  screenshot_and_comment:
+    runs-on: ubuntu-latest
+    steps:
+      # Step 1: Check out the repository containing the certificate HTML file.
+      # This brings the target HTML file into the runner's workspace.
+      - name: Checkout containers/automation repository
+        uses: actions/checkout@v4
+        with:
+          repository: containers/automation
+          path: automation-repo # Checkout into a specific directory
+
+      # Step 2: Check if this is the contributor's first merged PR
+      # This step uses the GitHub API to search for all merged PRs by the author in this repo.
+      # If the count is exactly 1, it's their first, and we proceed.
+      - name: Check for first-time contributor
+        id: check_first_pr
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged author:${author}`;
+            const result = await github.rest.search.issuesAndPullRequests({ q: query });
+            const mergedPRs = result.data.total_count;
+
+            console.log(`Found ${mergedPRs} merged PR(s) from @${author}.`);
+
+            if (mergedPRs === 1) {
+              console.log(`This is the first merged PR from @${author}. Proceeding to generate certificate.`);
+              core.setOutput('is_first_pr', 'true');
+            } else {
+              console.log(`@${author} has ${mergedPRs} merged PRs. No certificate will be generated.`);
+              core.setOutput('is_first_pr', 'false');
+            }
+
+      # Step 3: Update the HTML file locally
+      # This step only runs if the check for a first-time contributor passes.
+      - name: Update HTML file
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        run: |
+          # The path to your HTML file inside the checked-out directory
+          HTML_FILE="automation-repo/certificate-generator/certificate_generator.html"
+
+          # Contributor's GitHub username
+          CONTRIBUTOR_NAME="${{ github.event.pull_request.user.login }}"
+
+          # Pull Request number
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+
+          # Get the current date in a nice format
+          MERGE_DATE=$(date -u +"%B %d, %Y")
+
+          # Update the value for the contributor name input.
+          sed -i "/id=\"contributorName\"/s/value=\"[^\"]*\"/value=\"${CONTRIBUTOR_NAME}\"/" ${HTML_FILE}
+
+          # Update the value for the PR number input.
+          sed -i "/id=\"prNumber\"/s/value=\"[^\"]*\"/value=\"#${PR_NUMBER}\"/" ${HTML_FILE}
+
+          # Update the value for the merge date input.
+          sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE}
+
+      # Step 4: Setup Node.js environment
+      - name: Setup Node.js
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      # Step 5: Install Puppeteer
+      - name: Install Puppeteer
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        run: npm install puppeteer
+
+      # Step 6: Take a screenshot of the certificate div
+      - name: Take screenshot
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        run: |
+          node -e "
+          const puppeteer = require('puppeteer');
+          const path = require('path');
+
+          (async () => {
+            const browser = await puppeteer.launch({
+              args: ['--no-sandbox', '--disable-setuid-sandbox'],
+            });
+            const page = await browser.newPage();
+            // Point to the local, modified HTML file inside the checked-out directory
+            const htmlPath = 'file://' + path.resolve('automation-repo/certificate-generator/certificate_generator.html');
+            await page.goto(htmlPath, { waitUntil: 'networkidle0' });
+            await page.setViewport({ width: 1080, height: 720 });
+            const element = await page.$('#certificatePreview');
+            if (!element) {
+              console.error('Could not find element with id certificatePreview');
+              process.exit(1);
+            }
+            await element.screenshot({ path: 'certificate.png' });
+            await browser.close();
+            console.log('Screenshot taken and saved as certificate.png');
+          })();
+          "
+        id: screenshot
+
+      # Step 7: Upload screenshot as a workflow artifact
+      - name: Upload screenshot artifact
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: certificate-preview
+          path: certificate.png
+          retention-days: 7 # Keep the artifact for 7 days
+
+      # Step 8: Comment on Pull Request with a link to the artifact
+      - name: Comment with link to artifact
+        if: steps.check_first_pr.outputs.is_first_pr == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `🎉 Congratulations on your first merged pull request, @${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nA preview of your certificate has been generated. You can view and download it from the [workflow run artifacts](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}).`;
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: body,
+            });
