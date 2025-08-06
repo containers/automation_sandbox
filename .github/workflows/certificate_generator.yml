@@ -22,143 +22,149 @@ permissions:
   contents: read
   pull-requests: write
   actions: read
+  search: read # Required to search for past PRs
 
 jobs:
   screenshot_and_comment:
-    # This job runs if:
-    # 1. The event is a manual `workflow_dispatch`.
-    # 2. The event is a merged PR from a first-time contributor.
-    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR') }}
+    # This job runs if the PR was merged or if it's a manual trigger.
+    # The logic for first-time contributors is handled in a dedicated step below.
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true }}
     runs-on: ubuntu-latest
     steps:
-      # Step 1: Check out the repository containing the certificate HTML file.
-      # This brings the target HTML file into the runner's workspace.
+      # Step 1: Check if this is the contributor's first merged PR.
+      # This step is the source of truth and will control the execution of subsequent steps.
+      - name: Check for first merged PR
+        id: check_first_pr
+        if: ${{ github.event_name == 'pull_request' }}
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const author = context.payload.pull_request.user.login;
+            const query = `repo:${context.repo.owner}/${context.repo.repo} is:pr is:merged author:${author}`;
+            
+            console.log(`Searching for merged PRs from @${author} with query: "${query}"`);
+            
+            const result = await github.rest.search.issuesAndPullRequests({ q: query });
+            const mergedPRs = result.data.total_count;
+
+            if (mergedPRs === 1) {
+              console.log(`SUCCESS: This is the first merged PR from @${author}. Proceeding...`);
+              core.setOutput('is_first_pr', 'true');
+            } else {
+              console.log(`INFO: Skipping certificate generation. @${author} has ${mergedPRs} total merged PRs.`);
+              core.setOutput('is_first_pr', 'false');
+            }
+      
+      # Step 2: Checkout the repository containing the certificate HTML file.
       - name: Checkout containers/automation repository
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         uses: actions/checkout@v4
         with:
           repository: containers/automation
-          path: automation-repo # Checkout into a specific directory
+          path: automation-repo
 
-      # Step 2: Update the HTML file locally
-      # This step only runs if the conditions in the job's `if` statement are met.
+      # Step 3: Update the HTML file locally
       - name: Update HTML file
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         run: |
-          # The path to your HTML file inside the checked-out directory
           HTML_FILE="automation-repo/certificate-generator/certificate_generator.html"
-
-          # Set variables based on the trigger (manual dispatch or pull request)
           CONTRIBUTOR_NAME="${{ github.event.inputs.contributor_username || github.event.pull_request.user.login }}"
           PR_NUMBER="${{ github.event.inputs.pr_number || github.event.pull_request.number }}"
-
-          # Get the current date in a nice format
           MERGE_DATE=$(date -u +"%B %d, %Y")
 
-          # Update the value for the contributor name input, with failure logging.
-          sed -i "/id=\"contributorName\"/s/value=\"[^\"]*\"/value=\"${CONTRIBUTOR_NAME}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update contributor name in HTML file."; exit 1; }
-          
-          # Update the value for the PR number input, with failure logging.
-          sed -i "/id=\"prNumber\"/s/value=\"[^\"]*\"/value=\"#${PR_NUMBER}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update PR number in HTML file."; exit 1; }
+          sed -i "/id=\"contributorName\"/s/value=\"[^\"]*\"/value=\"${CONTRIBUTOR_NAME}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update contributor name."; exit 1; }
+          sed -i "/id=\"prNumber\"/s/value=\"[^\"]*\"/value=\"#${PR_NUMBER}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update PR number."; exit 1; }
+          sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update merge date."; exit 1; }
 
-          # Update the value for the merge date input, with failure logging.
-          sed -i "/id=\"mergeDate\"/s/value=\"[^\"]*\"/value=\"${MERGE_DATE}\"/" ${HTML_FILE} || { echo "ERROR: Failed to update merge date in HTML file."; exit 1; }
-
-      # Step 3: Setup Node.js environment
+      # Step 4: Setup Node.js environment
       - name: Setup Node.js
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         uses: actions/setup-node@v4
         with:
           node-version: '18'
 
-      # Step 4: Install Puppeteer
-      - name: Install Puppeteer
+      # Step 5: Install Puppeteer and embed-images
+      - name: Install Puppeteer and embed-images
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         run: |
-          npm install puppeteer || { echo "ERROR: Failed to install Puppeteer via npm."; exit 1; }
+          npm install puppeteer embed-images || { echo "ERROR: Failed to install npm packages."; exit 1; }
 
-      # Step 5: Take a screenshot of the certificate div
+      # Step 6: Take a screenshot of the certificate div
       - name: Create and run screenshot script
-        id: screenshot
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         run: |
-          # Create a separate JavaScript file to run with Node.js. This is cleaner than a long one-liner.
           cat <<'EOF' > screenshot.js
           const puppeteer = require('puppeteer');
           const path = require('path');
-
           (async () => {
-            const browser = await puppeteer.launch({
-              args: ['--no-sandbox', '--disable-setuid-sandbox'],
-            });
+            const browser = await puppeteer.launch({ args: ['--no-sandbox', '--disable-setuid-sandbox'] });
             const page = await browser.newPage();
             const htmlPath = 'file://' + path.resolve('automation-repo/certificate-generator/certificate_generator.html');
-            
-            console.log(`Navigating to: ${htmlPath}`);
             await page.goto(htmlPath, { waitUntil: 'networkidle0' });
-            
             await page.setViewport({ width: 1080, height: 720 });
-            
-            // Find the specific element to screenshot using its CSS selector.
-            console.log('Looking for element #certificatePreview...');
             const element = await page.$('#certificatePreview');
-            
             if (!element) {
-              console.error('Could not find element with id "certificatePreview". Please ensure it exists in the HTML file.');
+              console.error('Could not find element #certificatePreview.');
               process.exit(1);
             }
-            
-            console.log('Element found. Taking screenshot...');
             await element.screenshot({ path: 'certificate.png' });
-            
             await browser.close();
-            console.log('Screenshot taken and saved as certificate.png');
+            console.log('Screenshot saved as certificate.png');
           })().catch(err => {
-            console.error('An error occurred during the screenshot process:', err);
+            console.error(err);
             process.exit(1);
           });
           EOF
+          node screenshot.js || { echo "ERROR: Screenshot script failed."; exit 1; }
 
-          # Execute the script and echo a clear error message on failure.
-          node screenshot.js || { echo "ERROR: The screenshot script failed to execute."; exit 1; }
+      # Step 7: Create markdown file and embed image as base64
+      - name: Create embedded image markdown
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
+        run: |
+          # Create a simple markdown file with the image reference
+          echo "![Certificate Preview](certificate.png)" > certificate_temp.md
+          
+          # Use embed-images to convert the image to base64 and embed it
+          npx embed-images certificate_temp.md -o certificate_embedded.md
+          
+          # Extract just the embedded image content for the comment
+          EMBEDDED_IMAGE=$(cat certificate_embedded.md)
+          echo "EMBEDDED_IMAGE<<EOF" >> $GITHUB_ENV
+          echo "$EMBEDDED_IMAGE" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
-      # Step 6: Upload screenshot as a workflow artifact
-      - name: Upload screenshot artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: certificate-preview
-          path: certificate.png
-          retention-days: 7
-
-      # Step 7: Comment on Pull Request with a link to the artifact
-      # This step only runs for the pull_request trigger, not manual runs.
-      - name: Comment with link to artifact
-        if: github.event_name == 'pull_request'
+      # Step 8: Comment on Pull Request with embedded image
+      - name: Comment with embedded certificate image
+        if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         uses: actions/github-script@v7
         with:
           script: |
             try {
-              const body = \`🎉 Congratulations on your first merged pull request, @\${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nA preview of your certificate has been generated. You can view and download it from the [workflow run artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}).\`;
+              const embeddedImage = process.env.EMBEDDED_IMAGE;
+              let body;
+              
+              if (context.eventName === 'workflow_dispatch') {
+                // Manual trigger case
+                const contributorName = '${{ github.event.inputs.contributor_username }}';
+                const prNumber = '${{ github.event.inputs.pr_number }}';
+                body = \`📜 Certificate preview generated for @\${contributorName} (PR #\${prNumber}):\n\n\${embeddedImage}\`;
+              } else {
+                // Auto trigger case for first-time contributors
+                body = \`🎉 Congratulations on your first merged pull request, @\${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nHere's a preview of your certificate:\n\n\${embeddedImage}\`;
+              }
+              
               await github.rest.issues.createComment({
-                issue_number: context.issue.number,
+                issue_number: context.eventName === 'workflow_dispatch' ? ${{ github.event.inputs.pr_number }} : context.issue.number,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 body: body,
               });
             } catch (error) {
-              core.setFailed(`ERROR: Failed to comment on the pull request. Details: ${error.message}`);
+              core.setFailed(`ERROR: Failed to comment on PR. Details: ${error.message}`);
             }
-
-      # Step 8: Notify if comment is skipped on manual run
-      # This step logs that the comment was skipped because the workflow was run manually.
-      - name: Notify if comment is skipped
-        if: github.event_name == 'workflow_dispatch'
+      
+      # Step 9: Clean up temporary files
+      - name: Clean up temporary files
+        if: ${{ always() && (github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true') }}
         run: |
-          echo "INFO: Skipping comment step because the workflow was triggered manually."
-
-  notify_skip:
-    # This job runs only if the main job's conditions for a PR are not met.
-    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR' }}
-    runs-on: ubuntu-latest
-    steps:
-      - name: Notify that the action is skipped for a returning contributor
-        run: echo "Skipping certificate generation because @${{ github.event.pull_request.user.login }} is not a first-time contributor."
-
-
-
-
+          rm -f certificate.png certificate_temp.md certificate_embedded.md
