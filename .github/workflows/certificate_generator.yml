@@ -120,14 +120,38 @@ jobs:
       - name: Create embedded image markdown
         if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         run: |
+          # Check if certificate.png exists
+          if [ ! -f "certificate.png" ]; then
+            echo "ERROR: certificate.png not found!"
+            exit 1
+          fi
+          
+          # Show file info for debugging
+          ls -la certificate.png
+          
           # Create a simple markdown file with the image reference
           echo "![Certificate Preview](certificate.png)" > certificate_temp.md
           
           # Use embed-images to convert the image to base64 and embed it
           npx embed-images certificate_temp.md -o certificate_embedded.md
           
-          # Extract just the embedded image content for the comment
-          EMBEDDED_IMAGE=$(cat certificate_embedded.md)
+          # Debug: Show the result
+          echo "=== Original markdown ==="
+          cat certificate_temp.md
+          echo "=== Embedded markdown ==="
+          cat certificate_embedded.md
+          echo "========================="
+          
+          # Check if embed-images worked (should contain base64 data)
+          if grep -q "data:image" certificate_embedded.md; then
+            echo "SUCCESS: embed-images worked correctly"
+            EMBEDDED_IMAGE=$(cat certificate_embedded.md)
+          else
+            echo "WARNING: embed-images didn't work, falling back to manual base64 conversion"
+            # Manual fallback: create base64 embedded image
+            BASE64_DATA=$(base64 -w 0 certificate.png)
+            EMBEDDED_IMAGE="<img src=\"data:image/png;base64,${BASE64_DATA}\" alt=\"Certificate Preview\" />"
+          fi
           echo "EMBEDDED_IMAGE<<EOF" >> $GITHUB_ENV
           echo "$EMBEDDED_IMAGE" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
