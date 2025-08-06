@@ -28,7 +28,7 @@ jobs:
     # This job runs if:
     # 1. The event is a manual `workflow_dispatch`.
     # 2. The event is a merged PR from a first-time contributor.
-    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR')
+    if: ${{ github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true && github.event.pull_request.author_association == 'FIRST_TIME_CONTRIBUTOR') }}
     runs-on: ubuntu-latest
     steps:
       # Step 1: Check out the repository containing the certificate HTML file.
@@ -152,7 +152,7 @@ jobs:
 
   notify_skip:
     # This job runs only if the main job's conditions for a PR are not met.
-    if: github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR'
+    if: ${{ github.event_name == 'pull_request' && github.event.pull_request.merged == true && github.event.pull_request.author_association != 'FIRST_TIME_CONTRIBUTOR' }}
     runs-on: ubuntu-latest
     steps:
       - name: Notify that the action is skipped for a returning contributor
