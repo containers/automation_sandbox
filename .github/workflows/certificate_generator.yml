@@ -146,14 +146,19 @@ jobs:
                 // Manual trigger case
                 const contributorName = '${{ github.event.inputs.contributor_username }}';
                 const prNumber = '${{ github.event.inputs.pr_number }}';
-                body = \`📜 Certificate preview generated for @\${contributorName} (PR #\${prNumber}):\n\n\${embeddedImage}\`;
+                body = `📜 Certificate preview generated for @${contributorName} (PR #${prNumber}):\n\n${embeddedImage}`;
               } else {
                 // Auto trigger case for first-time contributors
-                body = \`🎉 Congratulations on your first merged pull request, @\${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nHere's a preview of your certificate:\n\n\${embeddedImage}\`;
+                const username = '${{ github.event.pull_request.user.login }}';
+                body = `🎉 Congratulations on your first merged pull request, @${username}! Thank you for your contribution.\n\nHere's a preview of your certificate:\n\n${embeddedImage}`;
               }
               
+              const issueNumber = context.eventName === 'workflow_dispatch' ? 
+                parseInt('${{ github.event.inputs.pr_number }}') : 
+                context.issue.number;
+              
               await github.rest.issues.createComment({
-                issue_number: context.eventName === 'workflow_dispatch' ? ${{ github.event.inputs.pr_number }} : context.issue.number,
+                issue_number: issueNumber,
                 owner: context.repo.owner,
                 repo: context.repo.repo,
                 body: body,
