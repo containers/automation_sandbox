@@ -148,7 +148,8 @@ jobs:
       # This step logs that the comment was skipped because the workflow was run manually.
       - name: Notify if comment is skipped
         if: github.event_name == 'workflow_dispatch'
-        run: echo "INFO: Skipping comment step because the workflow was triggered manually."
+        run: |
+          echo "INFO: Skipping comment step because the workflow was triggered manually."
 
   notify_skip:
     # This job runs only if the main job's conditions for a PR are not met.
