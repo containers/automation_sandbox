@@ -22,7 +22,6 @@ permissions:
   contents: read
   pull-requests: write
   actions: read
-  search: read # Required to search for past PRs
 
 jobs:
   screenshot_and_comment:
