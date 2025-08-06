@@ -132,13 +132,23 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const body = \`🎉 Congratulations on your first merged pull request, @\${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nA preview of your certificate has been generated. You can view and download it from the [workflow run artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}).\`;
-            await github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: body,
-            });
+            try {
+              const body = \`🎉 Congratulations on your first merged pull request, @\${{ github.event.pull_request.user.login }}! Thank you for your contribution.\n\nA preview of your certificate has been generated. You can view and download it from the [workflow run artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }}).\`;
+              await github.rest.issues.createComment({
+                issue_number: context.issue.number,
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                body: body,
+              });
+            } catch (error) {
+              core.setFailed(`ERROR: Failed to comment on the pull request. Details: ${error.message}`);
+            }
+
+      # Step 8: Notify if comment is skipped on manual run
+      # This step logs that the comment was skipped because the workflow was run manually.
+      - name: Notify if comment is skipped
+        if: github.event_name == 'workflow_dispatch'
+        run: echo "INFO: Skipping comment step because the workflow was triggered manually."
 
   notify_skip:
     # This job runs only if the main job's conditions for a PR are not met.
