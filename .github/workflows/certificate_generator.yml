@@ -82,10 +82,13 @@ jobs:
         with:
           node-version: '18'
 
-      # Step 5: Install Puppeteer and embed-images
-      - name: Install Puppeteer and embed-images
+      # Step 5: Install Puppeteer, embed-images, and ImageMagick
+      - name: Install Puppeteer, embed-images, and ImageMagick
         if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         run: |
+          # Install ImageMagick for image compression
+          sudo apt-get update && sudo apt-get install -y imagemagick
+          # Install npm packages
           npm install puppeteer embed-images || { echo "ERROR: Failed to install npm packages."; exit 1; }
 
       # Step 6: Take a screenshot of the certificate div
@@ -148,9 +151,34 @@ jobs:
             cp certificate_embedded.md embedded_image_final.md
           else
             echo "WARNING: embed-images didn't work, falling back to manual base64 conversion"
-            # Manual fallback: create base64 embedded image
-            BASE64_DATA=$(base64 -w 0 certificate.png)
-            echo "![Certificate Preview](data:image/png;base64,${BASE64_DATA})" > embedded_image_final.md
+            
+            # Check if the image is too large for GitHub comments
+            IMAGE_SIZE=$(stat -c%s certificate.png)
+            echo "Original image size: ${IMAGE_SIZE} bytes"
+            
+            if [ "$IMAGE_SIZE" -gt 100000 ]; then
+              echo "Image is large, trying to compress it first..."
+              # Try to compress the image using ImageMagick if available, or just resize with convert
+              if command -v convert >/dev/null 2>&1; then
+                convert certificate.png -quality 75 -resize "800x600>" certificate_compressed.png
+                if [ -f certificate_compressed.png ]; then
+                  echo "Using compressed image"
+                  IMAGE_FILE="certificate_compressed.png"
+                else
+                  echo "Compression failed, using original"
+                  IMAGE_FILE="certificate.png"
+                fi
+              else
+                echo "ImageMagick not available, using original image"
+                IMAGE_FILE="certificate.png"
+              fi
+            else
+              IMAGE_FILE="certificate.png"
+            fi
+            
+            # Manual fallback: create base64 embedded image with HTML img tag for better compatibility
+            BASE64_DATA=$(base64 -w 0 "$IMAGE_FILE")
+            echo "<img src=\"data:image/png;base64,${BASE64_DATA}\" alt=\"Certificate Preview\" style=\"max-width: 100%; height: auto;\" />" > embedded_image_final.md
           fi
           
           # Debug: Show file size and first 200 characters of the final embedded image
@@ -214,4 +242,4 @@ jobs:
       - name: Clean up temporary files
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true') }}
         run: |
-          rm -f certificate.png certificate_temp.md certificate_embedded.md embedded_image_final.md
+          rm -f certificate.png certificate_compressed.png certificate_temp.md certificate_embedded.md embedded_image_final.md
