@@ -150,8 +150,19 @@ jobs:
             echo "WARNING: embed-images didn't work, falling back to manual base64 conversion"
             # Manual fallback: create base64 embedded image
             BASE64_DATA=$(base64 -w 0 certificate.png)
-            echo "<img src=\"data:image/png;base64,${BASE64_DATA}\" alt=\"Certificate Preview\" />" > embedded_image_final.md
+            echo "![Certificate Preview](data:image/png;base64,${BASE64_DATA})" > embedded_image_final.md
           fi
+          
+          # Debug: Show file size and first 200 characters of the final embedded image
+          echo "=== Final embedded image file size ==="
+          ls -la embedded_image_final.md
+          echo "=== Final embedded image (first 200 chars) ==="
+          head -c 200 embedded_image_final.md
+          echo ""
+          echo "=== Final embedded image (last 100 chars) ==="
+          tail -c 100 embedded_image_final.md
+          echo ""
+          echo "========================="
           
           # Store just a flag to indicate we have the embedded image ready
           echo "EMBEDDED_IMAGE_READY=true" >> $GITHUB_ENV
@@ -166,6 +177,12 @@ jobs:
             try {
               // Read the embedded image from file instead of environment variable
               const embeddedImage = fs.readFileSync('embedded_image_final.md', 'utf8');
+              
+              // Debug: Log image info
+              console.log(`Embedded image length: ${embeddedImage.length}`);
+              console.log(`Embedded image starts with: ${embeddedImage.substring(0, 100)}`);
+              console.log(`Embedded image ends with: ${embeddedImage.substring(embeddedImage.length - 50)}`);
+              
               let body;
               
               if (context.eventName === 'workflow_dispatch') {
