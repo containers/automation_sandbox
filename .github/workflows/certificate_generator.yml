@@ -276,12 +276,7 @@ jobs:
                 const dataUrl = `data:image/${imageType};base64,${base64Data}`;
                 
                 // Create the image content - trying multiple approaches
-                const imageContent = `<details>
-<summary>🎉 **Certificate Preview** (click to expand)</summary>
-
-![Certificate Preview](${dataUrl})
-
-</details>`;
+                const imageContent = '<details>\n<summary>🎉 **Certificate Preview** (click to expand)</summary>\n\n![Certificate Preview](' + dataUrl + ')\n\n</details>';
                 
                 body = imageContent;
               } else {
