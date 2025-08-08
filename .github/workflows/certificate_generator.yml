@@ -151,7 +151,7 @@ jobs:
               // Configuration for the certificates repository
               // You can customize these values:
               const certificatesOwner = process.env.CERTIFICATES_REPO_OWNER || context.repo.owner;
-              const certificatesRepo = process.env.CERTIFICATES_REPO_NAME || 'certificates';
+              const certificatesRepo = process.env.CERTIFICATES_REPO_NAME || 'automation';
               const certificatesBranch = process.env.CERTIFICATES_REPO_BRANCH || 'main';
               
               console.log(`Uploading to repository: ${certificatesOwner}/${certificatesRepo}`);
@@ -184,9 +184,9 @@ jobs:
               // Provide helpful error message if it's likely a permissions issue
               let errorMsg = error.message;
               if (error.status === 404) {
-                errorMsg += ' (Repository not found - check CERTIFICATES_REPO_OWNER and CERTIFICATES_REPO_NAME environment variables, or ensure the repository exists and the token has access)';
+                errorMsg += ' (Repository not found - check CERTIFICATES_REPO_OWNER and CERTIFICATES_REPO_NAME environment variables, or ensure the automation repository exists and the token has access)';
               } else if (error.status === 403) {
-                errorMsg += ' (Permission denied - check that CERTIFICATES_REPO_TOKEN has write access to the target repository)';
+                errorMsg += ' (Permission denied - check that CERTIFICATES_REPO_TOKEN has write access to the automation repository)';
               }
               
               core.exportVariable('CERTIFICATE_UPLOADED', 'false');
