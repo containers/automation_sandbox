@@ -156,29 +156,68 @@ jobs:
             IMAGE_SIZE=$(stat -c%s certificate.png)
             echo "Original image size: ${IMAGE_SIZE} bytes"
             
-            if [ "$IMAGE_SIZE" -gt 100000 ]; then
-              echo "Image is large, trying to compress it first..."
-              # Try to compress the image using ImageMagick if available, or just resize with convert
+            if [ "$IMAGE_SIZE" -gt 50000 ]; then
+              echo "Image is large, trying aggressive compression..."
+              # More aggressive compression for GitHub compatibility
               if command -v convert >/dev/null 2>&1; then
-                convert certificate.png -quality 75 -resize "800x600>" certificate_compressed.png
+                # Try multiple compression strategies
+                convert certificate.png -quality 60 -resize "600x400>" -strip certificate_compressed.png
                 if [ -f certificate_compressed.png ]; then
-                  echo "Using compressed image"
-                  IMAGE_FILE="certificate_compressed.png"
+                  COMPRESSED_SIZE=$(stat -c%s certificate_compressed.png)
+                  echo "Compressed image size: ${COMPRESSED_SIZE} bytes"
+                  
+                  # If still too large, try JPEG conversion which is more efficient
+                  if [ "$COMPRESSED_SIZE" -gt 50000 ]; then
+                    echo "Still large, converting to JPEG..."
+                    convert certificate.png -quality 85 -resize "600x400>" -strip certificate_compressed.jpg
+                    if [ -f certificate_compressed.jpg ]; then
+                      JPG_SIZE=$(stat -c%s certificate_compressed.jpg)
+                      echo "JPEG size: ${JPG_SIZE} bytes"
+                      if [ "$JPG_SIZE" -lt "$COMPRESSED_SIZE" ]; then
+                        IMAGE_FILE="certificate_compressed.jpg"
+                        IMAGE_TYPE="jpeg"
+                      else
+                        IMAGE_FILE="certificate_compressed.png"
+                        IMAGE_TYPE="png"
+                      fi
+                    else
+                      IMAGE_FILE="certificate_compressed.png"
+                      IMAGE_TYPE="png"
+                    fi
+                  else
+                    IMAGE_FILE="certificate_compressed.png"
+                    IMAGE_TYPE="png"
+                  fi
                 else
                   echo "Compression failed, using original"
                   IMAGE_FILE="certificate.png"
+                  IMAGE_TYPE="png"
                 fi
               else
                 echo "ImageMagick not available, using original image"
                 IMAGE_FILE="certificate.png"
+                IMAGE_TYPE="png"
               fi
             else
               IMAGE_FILE="certificate.png"
+              IMAGE_TYPE="png"
             fi
             
-            # Manual fallback: create base64 embedded image with HTML img tag for better compatibility
-            BASE64_DATA=$(base64 -w 0 "$IMAGE_FILE")
-            echo "<img src=\"data:image/png;base64,${BASE64_DATA}\" alt=\"Certificate Preview\" style=\"max-width: 100%; height: auto;\" />" > embedded_image_final.md
+            # Check final size before embedding
+            FINAL_SIZE=$(stat -c%s "$IMAGE_FILE")
+            echo "Final image size: ${FINAL_SIZE} bytes"
+            
+            if [ "$FINAL_SIZE" -gt 80000 ]; then
+              echo "Image still too large for reliable GitHub embedding, will upload as artifact instead"
+              echo "UPLOAD_ARTIFACT=true" >> $GITHUB_ENV
+              echo "📜 **Certificate Preview Generated**" > embedded_image_final.md
+              echo "" >> embedded_image_final.md
+              echo "_The certificate image was generated but is too large to embed directly. You can download it from the [workflow run artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})._" >> embedded_image_final.md
+            else
+              # Manual fallback: create base64 embedded image with HTML img tag for better compatibility
+              BASE64_DATA=$(base64 -w 0 "$IMAGE_FILE")
+              echo "<img src=\"data:image/${IMAGE_TYPE};base64,${BASE64_DATA}\" alt=\"Certificate Preview\" style=\"max-width: 100%; height: auto;\" />" > embedded_image_final.md
+            fi
           fi
           
           # Debug: Show file size and first 200 characters of the final embedded image
@@ -194,6 +233,15 @@ jobs:
           
           # Store just a flag to indicate we have the embedded image ready
           echo "EMBEDDED_IMAGE_READY=true" >> $GITHUB_ENV
+
+      # Step 7.5: Upload artifact if image is too large to embed
+      - name: Upload certificate as artifact (fallback for large images)
+        if: ${{ env.UPLOAD_ARTIFACT == 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: certificate-preview
+          path: certificate.png
+          retention-days: 7
 
       # Step 8: Comment on Pull Request with embedded image
       - name: Comment with embedded certificate image
@@ -242,4 +290,4 @@ jobs:
       - name: Clean up temporary files
         if: ${{ always() && (github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true') }}
         run: |
-          rm -f certificate.png certificate_compressed.png certificate_temp.md certificate_embedded.md embedded_image_final.md
+          rm -f certificate.png certificate_compressed.png certificate_compressed.jpg certificate_temp.md certificate_embedded.md embedded_image_final.md
