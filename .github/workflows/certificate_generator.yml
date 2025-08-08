@@ -214,9 +214,15 @@ jobs:
               echo "" >> embedded_image_final.md
               echo "_The certificate image was generated but is too large to embed directly. You can download it from the [workflow run artifacts](\${{ github.server_url }}/\${{ github.repository }}/actions/runs/\${{ github.run_id }})._" >> embedded_image_final.md
             else
-              # Manual fallback: create base64 embedded image with HTML img tag for better compatibility
-              BASE64_DATA=$(base64 -w 0 "$IMAGE_FILE")
-              echo "<img src=\"data:image/${IMAGE_TYPE};base64,${BASE64_DATA}\" alt=\"Certificate Preview\" style=\"max-width: 100%; height: auto;\" />" > embedded_image_final.md
+              # GitHub has issues with base64 images, so let's try a GitHub-hosted approach
+              echo "EMBED_AS_BASE64=true" >> $GITHUB_ENV
+              echo "IMAGE_FILE_PATH=${IMAGE_FILE}" >> $GITHUB_ENV
+              echo "IMAGE_TYPE_VAR=${IMAGE_TYPE}" >> $GITHUB_ENV
+              
+              # Create a placeholder that will be replaced by the GitHub script
+              echo "🎉 **Certificate Preview**" > embedded_image_final.md
+              echo "" >> embedded_image_final.md
+              echo "_Uploading certificate image..._" >> embedded_image_final.md
             fi
           fi
           
@@ -251,25 +257,49 @@ jobs:
           script: |
             const fs = require('fs');
             try {
-              // Read the embedded image from file instead of environment variable
-              const embeddedImage = fs.readFileSync('embedded_image_final.md', 'utf8');
-              
-              // Debug: Log image info
-              console.log(`Embedded image length: ${embeddedImage.length}`);
-              console.log(`Embedded image starts with: ${embeddedImage.substring(0, 100)}`);
-              console.log(`Embedded image ends with: ${embeddedImage.substring(embeddedImage.length - 50)}`);
-              
               let body;
+              
+              // Check if we need to embed as base64 or use the pre-generated content
+              if (process.env.EMBED_AS_BASE64 === 'true') {
+                console.log('Attempting to create GitHub-compatible image...');
+                
+                // Read the compressed image file
+                const imageFile = process.env.IMAGE_FILE_PATH;
+                const imageType = process.env.IMAGE_TYPE_VAR;
+                const imageBuffer = fs.readFileSync(imageFile);
+                const base64Data = imageBuffer.toString('base64');
+                
+                console.log(`Image file: ${imageFile}, size: ${imageBuffer.length} bytes`);
+                console.log(`Base64 length: ${base64Data.length}`);
+                
+                // Try creating a simple base64 data URL
+                const dataUrl = `data:image/${imageType};base64,${base64Data}`;
+                
+                // Create the image content - trying multiple approaches
+                const imageContent = `<details>
+<summary>🎉 **Certificate Preview** (click to expand)</summary>
+
+![Certificate Preview](${dataUrl})
+
+</details>`;
+                
+                body = imageContent;
+              } else {
+                // Read the pre-generated embedded image content
+                const embeddedImage = fs.readFileSync('embedded_image_final.md', 'utf8');
+                console.log(`Using pre-generated content, length: ${embeddedImage.length}`);
+                body = embeddedImage;
+              }
               
               if (context.eventName === 'workflow_dispatch') {
                 // Manual trigger case
                 const contributorName = '${{ github.event.inputs.contributor_username }}';
                 const prNumber = '${{ github.event.inputs.pr_number }}';
-                body = `📜 Certificate preview generated for @${contributorName} (PR #${prNumber}):\n\n${embeddedImage}`;
+                body = `📜 Certificate preview generated for @${contributorName} (PR #${prNumber}):\n\n${body}`;
               } else {
                 // Auto trigger case for first-time contributors
                 const username = '${{ github.event.pull_request.user.login }}';
-                body = `🎉 Congratulations on your first merged pull request, @${username}! Thank you for your contribution.\n\nHere's a preview of your certificate:\n\n${embeddedImage}`;
+                body = `🎉 Congratulations on your first merged pull request, @${username}! Thank you for your contribution.\n\nHere's a preview of your certificate:\n\n${body}`;
               }
               
               const issueNumber = context.eventName === 'workflow_dispatch' ? 
