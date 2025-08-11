@@ -131,6 +131,23 @@ jobs:
                 throw new Error('certificate.png not found!');
               }
               
+              // Debug: Check token and repository access
+              console.log('Testing repository access...');
+              const certificatesOwner = process.env.CERTIFICATES_REPO_OWNER || context.repo.owner;
+              const certificatesRepo = process.env.CERTIFICATES_REPO_NAME || 'automation';
+              
+              // Test repository access first
+              try {
+                await github.rest.repos.get({
+                  owner: certificatesOwner,
+                  repo: certificatesRepo
+                });
+                console.log(`✅ Repository access confirmed: ${certificatesOwner}/${certificatesRepo}`);
+              } catch (accessError) {
+                console.error(`❌ Repository access failed: ${accessError.message}`);
+                throw new Error(`Cannot access repository ${certificatesOwner}/${certificatesRepo}. Check token permissions and repository existence.`);
+              }
+              
               // Read the certificate image
               const imageBuffer = fs.readFileSync('certificate.png');
               const base64Content = imageBuffer.toString('base64');
@@ -149,9 +166,6 @@ jobs:
               const filename = `certificates/${contributorName}-${prNumber}-${timestamp}.png`;
               
               // Configuration for the certificates repository
-              // You can customize these values:
-              const certificatesOwner = process.env.CERTIFICATES_REPO_OWNER || context.repo.owner;
-              const certificatesRepo = process.env.CERTIFICATES_REPO_NAME || 'automation';
               const certificatesBranch = process.env.CERTIFICATES_REPO_BRANCH || 'main';
               
               console.log(`Uploading to repository: ${certificatesOwner}/${certificatesRepo}`);
