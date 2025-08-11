@@ -19,7 +19,7 @@ on:
 
 # Permissions needed for this workflow.
 permissions:
-  contents: read  # Read access for current repository
+  contents: write  # Write access for fallback certificate storage
   pull-requests: write  # Write access to comment on PRs
   actions: read  # Read access for workflow actions
 
