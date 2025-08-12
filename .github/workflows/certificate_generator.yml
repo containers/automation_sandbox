@@ -19,8 +19,8 @@ on:
 
 # Permissions needed for this workflow.
 permissions:
-  contents: write  # Write access for fallback certificate storage
-  pull-requests: write  # Write access to comment on PRs
+  contents: read  # Write access for certificate storage
+  #pull-requests: write  # Write access to comment on PRs
   actions: read  # Read access for workflow actions
 
 jobs:
@@ -177,9 +177,17 @@ jobs:
                 owner: certificatesOwner,
                 repo: certificatesRepo,
                 path: filename,
-                message: `Add certificate for ${contributorName} from ${context.repo.owner}/${context.repo.repo} (PR #${prNumber})`,
+                message: `Add certificate for ${contributorName} from ${context.repo.owner}/${context.repo.repo} (PR #${prNumber})\n\nSigned-off-by: Podman Bot <podman.bot@example.com>`,
                 content: base64Content,
-                branch: certificatesBranch
+                branch: certificatesBranch,
+                author: {
+                  name: 'Podman Bot',
+                  email: 'podman.bot@example.com'
+                },
+                committer: {
+                  name: 'Podman Bot',
+                  email: 'podman.bot@example.com'
+                }
               });
               
               // Create the image URL
