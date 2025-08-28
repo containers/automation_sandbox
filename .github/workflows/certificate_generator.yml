@@ -1,4 +1,3 @@
-# .github/workflows/certificate_generator.yml
 name: Generate Contributor Certificate Preview
 
 # This action triggers automatically when a pull request is closed,
@@ -80,7 +79,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: latest
 
       # Step 5: Install Puppeteer
       - name: Install Puppeteer
@@ -121,7 +120,7 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' || steps.check_first_pr.outputs.is_first_pr == 'true' }}
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.CERTIFICATES_REPO_TOKEN || github.token }}
+          github-token: ${{ secrets.CERTIFICATES_REPO_TOKEN }}
           script: |
             const fs = require('fs');
             
